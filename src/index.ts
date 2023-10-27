@@ -50,11 +50,17 @@ app.all("*", async (req, res) => {
 
   let discoveredTx = false;
   if (body.method == "eth_sendBundle") {
-    for (const tx of body.params[0].txs) {
+    console.log("body.params[0] before", body.params[0]);
+    for (const [index, tx] of body.params[0].txs.entries()) {
       const target = Transaction.from(tx);
-      console.log("looking at tx", tx, "to", target.to);
-      if (target.to === env.oevOracle) discoveredTx = true;
+      console.log("looking at tx", target.hash, "to", target.to);
+      if (target.to === env.oevOracle) {
+        discoveredTx = true;
+        delete body.params[0].txs[index];
+      }
     }
+    body.params[0].txs = body.params[0].txs.filter(Boolean);
+    console.log("body.params[0] after", body.params[0]);
   }
 
   if (discoveredTx) {
@@ -72,7 +78,9 @@ app.all("*", async (req, res) => {
     console.log(
       `sending backrun bundles targeting next ${NUM_TARGET_BLOCKS} blocks...`
     );
+    console.log("bundle", bundle);
     const targetBlock = parseInt(Number(body.params[0].blockNumber).toString());
+    console.log("MEV-share targetBlock", targetBlock);
     const bundleParams: BundleParams = {
       inclusion: {
         block: targetBlock,
@@ -150,17 +158,17 @@ export const sendUpdateTx = async (
   return await mevshare.sendTransaction(signedTx, {
     hints,
     maxBlockNumber,
-    builders: [
-      "flashbots",
-      "f1b.io",
-      "rsync",
-      "beaverbuild.org",
-      "builder0x69",
-      "Titan",
-      "EigenPhi",
-      "boba-builder",
-      "Gambit Labs",
-      "payload",
-    ],
+    // builders: [
+    //   "builder0x69",
+    //   "boba-builder",
+    //   "gambit+labs",
+    //   "eigenphi",
+    //   "rsync",
+    //   "flashbots",
+    //   "f1b.io",
+    //   "beaverbuild.org",
+    //   "titan",
+    //   "payload",
+    // ],
   });
 };
