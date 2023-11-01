@@ -27,6 +27,8 @@
     "dotenv": "^16.3.1"
   },
   "scripts": {
-    "start": "nodemon"
+    "dev": "nodemon",
+    "build": "tsc",
+    "start": "node ./out/index.js"
   }
 }
