@@ -75,7 +75,7 @@ app.all("*", async (req, res) => {
       res.status(200).send({ jsonrpc: "2.0", id: body.id, result: backrunResult });
     }
   } else {
-    // Else, if we did not it an eth_sendBundle or the handelers did not find a transaction payload to modify, simply
+    // Else, if we did not hit an eth_sendBundle or the handlers did not find a transaction payload to modify, simply
     // forward the request to the FORWARD_URL.
     try {
       const response = await axios({
