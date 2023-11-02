@@ -15,7 +15,7 @@ import { initWallet, getProvider, env } from "./lib";
 import { oevOracleAbi } from "./abi";
 import { processBundle } from "./handlers";
 
-const agent = new https.Agent({ rejectUnauthorized: false });
+const agent = new https.Agent({ rejectUnauthorized: false }); // this might not be needed (and might add security risks in prod).
 
 const app = express();
 app.use(bodyParser.json());
@@ -29,14 +29,6 @@ app.all("*", async (req, res) => {
   const { url, method, body } = req;
   console.log(`\nReceived: ${method} ${url}`);
   console.log(`Body: ${JSON.stringify(body, null, 2)}`); // Pretty print JSON
-
-  const forwardUrl = process.env.FORWARD_URL || "https://relay.flashbots.net";
-
-  if (!forwardUrl) {
-    console.error("FORWARD_URL is not defined");
-    res.status(500).send("Internal Server Error");
-    return;
-  }
 
   // If the request is an eth_sendBundle, process the bundle. The process Bundle function will execute target specific
   // modifications to the bundle depending on its structure.
@@ -53,10 +45,10 @@ app.all("*", async (req, res) => {
       const updateTx = await sendUnlockLatestValue(wallet, mevshare, oevOracle, targetBlock, oevShare, refundAddress);
 
       // Construct the bundle with the modified payload to backrun the UnlockLatestValue call.
-      const bundle = [
+      const bundle: Array<{ hash: string } | { tx: string; canRevert: boolean }> = [
         { hash: updateTx },
-        ...body.params[0].txs.map((tx: any) => {
-          return { tx: tx, canRevert: false };
+        ...processedTransactions.map((tx: Transaction): { tx: string; canRevert: boolean } => {
+          return { tx: tx.serialized, canRevert: false };
         }),
       ];
 
@@ -73,27 +65,27 @@ app.all("*", async (req, res) => {
       const backrunResult = await mevshare.sendBundle(bundleParams);
 
       res.status(200).send({ jsonrpc: "2.0", id: body.id, result: backrunResult });
+      return;
     }
-  } else {
-    // Else, if we did not it an eth_sendBundle or the handelers did not find a transaction payload to modify, simply
-    // forward the request to the FORWARD_URL.
-    try {
-      const response = await axios({
-        method: method as any,
-        url: `${forwardUrl}`,
-        headers: { ...req.headers, host: new URL(forwardUrl).hostname },
-        data: body,
-        httpsAgent: agent,
-      });
+  }
+  // Else, if we did not it an eth_sendBundle or the handelers did not find a transaction payload to modify, simply
+  // forward the request to the FORWARD_URL.
+  try {
+    const response = await axios({
+      method: method as any,
+      url: `${env.forwardUrl}`,
+      headers: { ...req.headers, host: new URL(env.forwardUrl).hostname },
+      data: body,
+      httpsAgent: agent,
+    });
 
-      const { status, data } = response;
+    const { status, data } = response;
 
-      res.status(status).send(data);
-    } catch (error) {
-      console.error("There was an error produced against body", body);
-      console.error("error", error);
-      res.status(500).send("Internal Server Error");
-    }
+    res.status(status).send(data);
+  } catch (error) {
+    console.error("There was an error produced against body", body);
+    console.error("error", error);
+    res.status(500).send("Internal Server Error");
   }
 });
 
@@ -162,5 +154,7 @@ export const sendUnlockLatestValue = async (
 
   console.log(`Unlock Latest Call bundle: ${JSON.stringify(bundleParams, null, 2)}`); // Pretty print JSON
   await mevshare.sendBundle(bundleParams);
-  return Transaction.from(signedTx).hash;
+  const hash = Transaction.from(signedTx).hash;
+  if (!hash) throw new Error("No hash returned from sendBundle");
+  return hash;
 };

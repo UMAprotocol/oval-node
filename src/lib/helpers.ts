@@ -21,7 +21,3 @@ export async function initWallet(provider: JsonRpcProvider | WebSocketProvider) 
     feeData: await provider.getFeeData(),
   };
 }
-
-export async function sleep(ms: any) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
