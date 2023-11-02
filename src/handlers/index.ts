@@ -1,6 +1,6 @@
 import { Transaction } from "ethers";
 
-// Sample bundle processor. Can be extended to handel different kinds of bundle decomposition. For now it
+// Sample bundle processor. Can be extended to handle different kinds of bundle decomposition. For now it
 // simply looks for backrun txs to the demo implementation and removes them from the bundle. It is also responsible for
 // matching a given bundle type and returning the appropriate contract address and refund address.
 export function processBundle(transactions: Transaction[]): {
