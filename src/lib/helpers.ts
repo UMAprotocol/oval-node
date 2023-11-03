@@ -14,10 +14,7 @@ export async function initWallet(provider: JsonRpcProvider | WebSocketProvider) 
   const authSigner = new Wallet(env.authKey).connect(provider);
 
   return {
-    provider,
     wallet: new Wallet(env.senderKey).connect(provider),
-    authSigner,
     mevshare: MevShareClient.useEthereumMainnet(authSigner),
-    feeData: await provider.getFeeData(),
   };
 }
