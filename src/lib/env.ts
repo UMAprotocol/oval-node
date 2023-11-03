@@ -1,5 +1,6 @@
 import { getAddress } from "ethers";
 import dotenv from "dotenv";
+import { fallback } from "./constants";
 dotenv.config({ path: ".env" });
 
 const environmentError = (varName: string) => new Error(`Environment error: ${varName} not set.`);
@@ -7,15 +8,13 @@ const environmentError = (varName: string) => new Error(`Environment error: ${va
 if (!process.env.AUTH_PRIVATE_KEY) throw environmentError("AUTH_PRIVATE_KEY");
 if (!process.env.SENDER_PRIVATE_KEY) throw environmentError("SENDER_PRIVATE_KEY");
 if (!process.env.PROVIDER_URL) throw environmentError("PROVIDER_URL");
-if (!process.env.OEV_ORACLE_ADDRESS) throw environmentError("OEV_ORACLE_ADDRESS");
-if (!process.env.FORWARD_URL) throw environmentError("FORWARD_URL");
 
 export const env = {
-  authKey: process.env.AUTH_PRIVATE_KEY || "",
-  providerUrl: process.env.PROVIDER_URL || "",
-  providerWss: process.env.PROVIDER_WSS || "",
-  oevShareBuilder: process.env.OEV_SHARE_BUILDER || "",
-  senderKey: process.env.SENDER_PRIVATE_KEY || "",
-  forwardUrl: process.env.FORWARD_URL || "https://relay.flashbots.net",
-  oevOracle: getAddress(process.env.OEV_ORACLE_ADDRESS) || "0",
+  authKey: process.env.AUTH_PRIVATE_KEY,
+  providerUrl: process.env.PROVIDER_URL,
+  senderKey: process.env.SENDER_PRIVATE_KEY,
+  forwardUrl: process.env.FORWARD_URL || fallback.forwardUrl,
+  oevOracle: process.env.OEV_ORACLE_ADDRESS ? getAddress(process.env.OEV_ORACLE_ADDRESS) : fallback.oevOracle,
+  honeyPot: process.env.HONEYPOT_ADDRESS ? getAddress(process.env.HONEYPOT_ADDRESS) : fallback.honeyPot,
+  refundAddress: process.env.REFUND_ADDRESS ? getAddress(process.env.REFUND_ADDRESS) : fallback.refundAddress,
 };
