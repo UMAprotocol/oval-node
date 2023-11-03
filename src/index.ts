@@ -47,8 +47,8 @@ app.all("*", async (req, res) => {
       // Construct the bundle with the modified payload to backrun the UnlockLatestValue call.
       const bundle: Array<{ hash: string } | { tx: string; canRevert: boolean }> = [
         { hash: updateTx },
-        ...processedTransactions.map((tx: Transaction): { tx: string; canRevert: boolean } => {
-          return { tx: tx.serialized, canRevert: false };
+        ...processedTransactions.map((tx): { tx: string; canRevert: boolean } => {
+          return { tx, canRevert: false };
         }),
       ];
 
