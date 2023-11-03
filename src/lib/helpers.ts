@@ -47,6 +47,7 @@ export function getInt(input: string): number {
   return output;
 }
 
+// Simple type guard to ensure check that a value is defined (and help typescript understand).
 export function isDefined<T>(input: T | null | undefined): input is T {
   return input !== null && input !== undefined;
 }

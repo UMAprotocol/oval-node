@@ -125,7 +125,8 @@ export const sendUnlockLatestValue = async (
     value: 0,
     gasLimit: 200000,
     data,
-    maxFeePerGas: baseFee * 2n, // Double the current base fee as a basic safe gas esimtate. We can make this more sophisticated in the future.
+    // Double the current base fee as a basic safe gas esimtate. We can make this more sophisticated in the future.
+    maxFeePerGas: baseFee * 2n,
     maxPriorityFeePerGas: 0, // searcher should pay the full tip.
   };
 
