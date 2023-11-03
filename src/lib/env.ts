@@ -1,5 +1,6 @@
 import { getAddress } from "ethers";
 import dotenv from "dotenv";
+import { fallback } from "./constants";
 dotenv.config({ path: ".env" });
 
 function getEnvVar(varName: string, defaultValue?: string): string {
@@ -14,6 +15,8 @@ export const env = {
   providerUrl: getEnvVar("PROVIDER_URL"),
   providerWss: getEnvVar("PROVIDER_WSS"),
   senderKey: getEnvVar("SENDER_PRIVATE_KEY"),
-  forwardUrl: getEnvVar("FORWARD_URL"),
-  oevOracle: getAddress(getEnvVar("OEV_ORACLE_ADDRESS")),
+  forwardUrl: getEnvVar("FORWARD_URL", fallback.forwardUrl),
+  oevOracle: getAddress(getEnvVar("OEV_ORACLE_ADDRESS", fallback.oevOracle)),
+  honeyPot: getAddress(getEnvVar("HONEYPOT_ADDRESS", fallback.honeyPot)),
+  refundAddress: getAddress(getEnvVar("REFUND_ADDRESS", fallback.refundAddress)),
 };
