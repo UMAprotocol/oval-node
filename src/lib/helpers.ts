@@ -6,10 +6,6 @@ export function getProvider() {
   return new JsonRpcProvider(env.providerUrl, new Network("mainnet", 1));
 }
 
-export function getWebsocketProvider() {
-  return new WebSocketProvider(env.providerWss, new Network("mainnet", 1));
-}
-
 export async function initWallet(provider: JsonRpcProvider | WebSocketProvider) {
   const authSigner = new Wallet(env.authKey).connect(provider);
 

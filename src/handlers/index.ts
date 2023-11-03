@@ -1,4 +1,5 @@
 import { Transaction } from "ethers";
+import { env } from "../lib";
 
 // Sample bundle processor. Can be extended to handle different kinds of bundle decomposition. For now it
 // simply looks for backrun txs to the demo implementation and removes them from the bundle. It is also responsible for
@@ -15,10 +16,10 @@ export function processBundle(transactions: string[]): {
   for (const [index, tx] of transactions.entries()) {
     const target = Transaction.from(tx);
 
-    if (target.to === "0xAFA42f17e0C4e6E80Bd743BB67ed02da2Fbd8965" && target.data === "0x4d54a8ca") {
+    if (target.to === env.honeyPot && target.data === "0x4d54a8ca") {
       processedBundle = true;
-      oevShare = "0xb3cAcdC722470259886Abb57ceE1fEA714e86387";
-      refundAddress = "0xe4d0cC1976D637d01eC8d4429e8cA6F96254654b";
+      oevShare = env.oevOracle;
+      refundAddress = env.refundAddress;
       delete transactions[index];
     }
   }
