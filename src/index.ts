@@ -33,10 +33,10 @@ app.all("*", async (req, res) => {
   // If the request is an eth_sendBundle, process the bundle. The process Bundle function will execute target specific
   // modifications to the bundle depending on its structure.
   if (body.method == "eth_sendBundle") {
-    const { processedTransactions, processedBundle, oevShare, refundAddress } = processBundle(body.params[0].txs);
-    if (processedBundle) {
+    const processResult = processBundle(body.params[0].txs);
+    if (processResult.foundOEVTransaction) {
+      const { oevShare, refundAddress, processedTransactions } = processResult;
       console.log("discovered tx & modified payload! Sending unlock tx bundle and backrun bundle...");
-      body.params[0].txs = processedTransactions;
       const targetBlock = parseInt(Number(body.params[0].blockNumber).toString());
 
       const { wallet, mevshare } = await initWallet(provider);

@@ -14,3 +14,10 @@ export async function initWallet(provider: JsonRpcProvider | WebSocketProvider) 
     mevshare: MevShareClient.useEthereumMainnet(authSigner),
   };
 }
+
+// Simple utility function that returns a copy of an input array with a dropped element.
+export function copyAndDrop<T>(array: T[], index: number): T[] {
+  const clone = array.slice();
+  clone.splice(index, 1);
+  return clone;
+}
