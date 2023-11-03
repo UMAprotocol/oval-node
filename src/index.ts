@@ -134,7 +134,6 @@ export const sendUnlockLatestValue = async (
         logs: true,
         contractAddress: true,
         functionSelector: true,
-        defaultLogs: true,
         txHash: true,
       },
       builders: [
