@@ -13,9 +13,7 @@ export const oevOracleAbi = [
   },
   {
     anonymous: false,
-    inputs: [
-      { indexed: true, internalType: "uint8", name: "decimals", type: "uint8" },
-    ],
+    inputs: [{ indexed: true, internalType: "uint8", name: "decimals", type: "uint8" }],
     name: "DecimalsSet",
     type: "event",
   },
@@ -320,18 +318,14 @@ export const oevOracleAbi = [
     type: "function",
   },
   {
-    inputs: [
-      { internalType: "uint256", name: "newLockWindow", type: "uint256" },
-    ],
+    inputs: [{ internalType: "uint256", name: "newLockWindow", type: "uint256" }],
     name: "setLockWindow",
     outputs: [],
     stateMutability: "nonpayable",
     type: "function",
   },
   {
-    inputs: [
-      { internalType: "uint256", name: "newMaxTraversal", type: "uint256" },
-    ],
+    inputs: [{ internalType: "uint256", name: "newMaxTraversal", type: "uint256" }],
     name: "setMaxTraversal",
     outputs: [],
     stateMutability: "nonpayable",
