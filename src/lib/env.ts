@@ -1,6 +1,7 @@
 import { getAddress } from "ethers";
 import dotenv from "dotenv";
 import { fallback } from "./constants";
+import { getInt, getFloat } from "./helpers";
 dotenv.config({ path: ".env" });
 
 function getEnvVar(varName: string, defaultValue?: string): string {
@@ -19,4 +20,6 @@ export const env = {
   oevOracle: getAddress(getEnvVar("OEV_ORACLE_ADDRESS", fallback.oevOracle)),
   honeyPot: getAddress(getEnvVar("HONEYPOT_ADDRESS", fallback.honeyPot)),
   refundAddress: getAddress(getEnvVar("REFUND_ADDRESS", fallback.refundAddress)),
+  blockRangeSize: getInt(getEnvVar("BLOCK_RANGE_SIZE", fallback.blockRangeSize)),
+  refundPercent: getFloat(getEnvVar("REFUND_PERCENT", fallback.refundPercent)),
 };

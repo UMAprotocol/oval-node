@@ -1,28 +1,33 @@
 import { Transaction } from "ethers";
-import { env } from "../lib";
+import { env, copyAndDrop } from "../lib";
 
 // Sample bundle processor. Can be extended to handle different kinds of bundle decomposition. For now it
 // simply looks for backrun txs to the demo implementation and removes them from the bundle. It is also responsible for
 // matching a given bundle type and returning the appropriate contract address and refund address.
-export function processBundle(transactions: string[]): {
-  processedTransactions: string[];
-  processedBundle: boolean;
-  oevShare: string;
-  refundAddress: string;
-} {
-  let processedBundle = false,
-    oevShare = "",
-    refundAddress = "";
+export function processBundle(transactions: string[]):
+  | {
+      processedTransactions: string[];
+      foundOEVTransaction: true;
+      oevShare: string;
+      refundAddress: string;
+    }
+  | { foundOEVTransaction: false } {
   for (const [index, tx] of transactions.entries()) {
     const target = Transaction.from(tx);
 
     if (target.to === env.honeyPot && target.data === "0x4d54a8ca") {
-      processedBundle = true;
-      oevShare = env.oevOracle;
-      refundAddress = env.refundAddress;
-      delete transactions[index];
+      // Notes:
+      // 1. Right now, this does not check for multiple calls that match, as that is unexpected. Open question: how should that be handled?
+      // 2. Copy transactions to avoid modifying the input, which the calling code might not expect.
+      return {
+        foundOEVTransaction: true,
+        oevShare: env.oevOracle,
+        refundAddress: env.refundAddress,
+        processedTransactions: copyAndDrop(transactions, index),
+      };
     }
   }
 
-  return { processedTransactions: transactions.filter(Boolean), processedBundle, oevShare, refundAddress };
+  // Don't return irrelevant parameters if nothing was found. Caller will have to check the boolean before accessing.
+  return { foundOEVTransaction: false };
 }

@@ -11,7 +11,7 @@ import { toBigInt, Wallet, TransactionRequest, Contract, Transaction } from "eth
 import { BundleParams } from "@flashbots/mev-share-client";
 import MevShareClient from "@flashbots/mev-share-client";
 
-import { initWallet, getProvider, env } from "./lib";
+import { initWallet, getProvider, env, getBaseFee } from "./lib";
 import { oevOracleAbi } from "./abi";
 import { processBundle } from "./handlers";
 
@@ -33,20 +33,27 @@ app.all("*", async (req, res) => {
   // If the request is an eth_sendBundle, process the bundle. The process Bundle function will execute target specific
   // modifications to the bundle depending on its structure.
   if (body.method == "eth_sendBundle") {
-    const { processedTransactions, processedBundle, oevShare, refundAddress } = processBundle(body.params[0].txs);
-    if (processedBundle) {
+    const processResult = processBundle(body.params[0].txs);
+    if (processResult.foundOEVTransaction) {
+      const { oevShare, refundAddress, processedTransactions } = processResult;
       console.log("discovered tx & modified payload! Sending unlock tx bundle and backrun bundle...");
-      body.params[0].txs = processedTransactions;
       const targetBlock = parseInt(Number(body.params[0].blockNumber).toString());
 
       const { wallet, mevshare } = await initWallet(provider);
 
       // Send the call to OEVShare to unlock the latest value.
-      const updateTx = await sendUnlockLatestValue(wallet, mevshare, oevOracle, targetBlock, oevShare, refundAddress);
+      const unlockTxHash = await sendUnlockLatestValue(
+        wallet,
+        mevshare,
+        oevOracle,
+        targetBlock,
+        oevShare,
+        refundAddress,
+      );
 
       // Construct the bundle with the modified payload to backrun the UnlockLatestValue call.
-      const bundle: Array<{ hash: string } | { tx: string; canRevert: boolean }> = [
-        { hash: updateTx },
+      const bundle: BundleParams["body"] = [
+        { hash: unlockTxHash },
         ...processedTransactions.map((tx): { tx: string; canRevert: boolean } => {
           return { tx, canRevert: false };
         }),
@@ -55,7 +62,7 @@ app.all("*", async (req, res) => {
       const bundleParams: BundleParams = {
         inclusion: {
           block: targetBlock,
-          maxBlock: targetBlock + 25,
+          maxBlock: targetBlock + env.blockRangeSize,
         },
         body: bundle,
       };
@@ -101,16 +108,25 @@ export const sendUnlockLatestValue = async (
   oevShare: string,
   refundAddress: string,
 ) => {
+  // Run concurrently to save a little time.
+  const [nonce, baseFee, data, network] = await Promise.all([
+    wallet.getNonce(),
+    getBaseFee(provider),
+    oevOracle.interface.encodeFunctionData("unlockLatestValue"),
+    provider.getNetwork(),
+  ]);
+
   // Construct transaction to call unlockLatestValue on OEVShare Oracle from permissioned address.
   const tx: TransactionRequest = {
     type: 2,
-    chainId: provider._network.chainId,
+    chainId: network.chainId,
     to: oevShare, // Target is OEVShare Oracle used in the demo.
-    nonce: await wallet.getNonce(),
+    nonce,
     value: 0,
     gasLimit: 200000,
-    data: await oevOracle.interface.encodeFunctionData("unlockLatestValue"),
-    maxFeePerGas: toBigInt(50e9),
+    data,
+    // Double the current base fee as a basic safe gas esimtate. We can make this more sophisticated in the future.
+    maxFeePerGas: baseFee * 2n,
     maxPriorityFeePerGas: 0, // searcher should pay the full tip.
   };
 
@@ -118,13 +134,13 @@ export const sendUnlockLatestValue = async (
 
   // Send this as a bundle. Define the max share hints and share 70% kickback to HoneyDao (demo contract).
   const bundleParams: BundleParams = {
-    inclusion: { block: targetBlock, maxBlock: targetBlock + 25 },
+    inclusion: { block: targetBlock, maxBlock: targetBlock + env.blockRangeSize },
     body: [{ tx: signedTx, canRevert: false }],
     validity: {
       refundConfig: [
         {
           address: refundAddress,
-          percent: 70,
+          percent: env.refundPercent,
         },
       ],
     },
