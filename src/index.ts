@@ -8,10 +8,11 @@ import morgan from "morgan";
 dotenv.config();
 
 import { toBigInt, Wallet, TransactionRequest, Contract, Transaction } from "ethers";
+import { isJSONRPCRequest, isJSONRPCID } from "json-rpc-2.0";
 import { BundleParams } from "@flashbots/mev-share-client";
 import MevShareClient from "@flashbots/mev-share-client";
 
-import { initWallet, getProvider, env, getBaseFee } from "./lib";
+import { initWallet, getProvider, env, getBaseFee, isEthSendBundleParams } from "./lib";
 import { oevOracleAbi } from "./abi";
 import { processBundle } from "./handlers";
 
@@ -30,9 +31,14 @@ app.all("*", async (req, res) => {
   console.log(`\nReceived: ${method} ${url}`);
   console.log(`Body: ${JSON.stringify(body, null, 2)}`); // Pretty print JSON
 
-  // If the request is an eth_sendBundle, process the bundle. The process Bundle function will execute target specific
-  // modifications to the bundle depending on its structure.
-  if (body.method == "eth_sendBundle") {
+  // If the request is a valid JSON RPC 2.0 eth_sendBundle method, process the bundle. The process Bundle function will
+  // execute target specific modifications to the bundle depending on its structure.
+  if (
+    isJSONRPCRequest(body) &&
+    isJSONRPCID(body.id) &&
+    body.method == "eth_sendBundle" &&
+    isEthSendBundleParams(body.params)
+  ) {
     const processResult = processBundle(body.params[0].txs);
     if (processResult.foundOEVTransaction) {
       const { oevShare, refundAddress, processedTransactions } = processResult;
@@ -75,8 +81,8 @@ app.all("*", async (req, res) => {
       return;
     }
   }
-  // Else, if we did not it an eth_sendBundle or the handelers did not find a transaction payload to modify, simply
-  // forward the request to the FORWARD_URL.
+  // Else, if we did not receive a valid eth_sendBundle or the handlers did not find a transaction payload to modify,
+  // simply forward the request to the FORWARD_URL.
   try {
     const response = await axios({
       method: method as any,
