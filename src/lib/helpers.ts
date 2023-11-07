@@ -1,4 +1,4 @@
-import { JsonRpcProvider, WebSocketProvider, Network, Wallet, Provider } from "ethers";
+import { JsonRpcProvider, WebSocketProvider, Network, Wallet, Provider, isHexString, Transaction } from "ethers";
 import MevShareClient from "@flashbots/mev-share-client";
 import { env } from "./env";
 
@@ -50,4 +50,28 @@ export function getInt(input: string): number {
 // Simple type guard to ensure check that a value is defined (and help typescript understand).
 export function isDefined<T>(input: T | null | undefined): input is T {
   return input !== null && input !== undefined;
+}
+
+// Helper function for bundle params type guard making sure all tx strings can be decoded.
+function isValidTx(tx: any) {
+  if (typeof tx !== "string") return false;
+  try {
+    Transaction.from(tx);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// Type guard for params in eth_sendBundle method. We ignore all optional properties as we don't use them.
+// Based on Flashbots RPC Endpont docs: https://docs.flashbots.net/flashbots-auction/advanced/rpc-endpoint#eth_sendbundle
+export function isEthSendBundleParams(params: any): params is [{ txs: string[]; blockNumber: string }] {
+  return (
+    Array.isArray(params) &&
+    params.length === 1 &&
+    typeof params[0] === "object" &&
+    Array.isArray(params[0].txs) &&
+    params[0].txs.every((tx: any) => isValidTx(tx)) &&
+    isHexString(params[0].blockNumber)
+  );
 }
