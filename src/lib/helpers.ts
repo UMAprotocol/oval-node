@@ -64,6 +64,7 @@ function isValidTx(tx: any) {
 }
 
 // Type guard for params in eth_sendBundle method. We ignore all optional properties as we don't use them.
+// Based on Flashbots RPC Endpont docs: https://docs.flashbots.net/flashbots-auction/advanced/rpc-endpoint#eth_sendbundle
 export function isEthSendBundleParams(params: any): params is [{ txs: string[]; blockNumber: string }] {
   return (
     Array.isArray(params) &&
