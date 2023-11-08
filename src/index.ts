@@ -82,6 +82,14 @@ app.post("/", async (req, res, next) => {
         return; // Exit the function here to prevent the request from being forwarded to the FORWARD_URL.
       }
     }
+    if (
+      isJSONRPCRequest(body) &&
+      isJSONRPCID(body.id) &&
+      body.method == "eth_callBundle" &&
+      isEthSendBundleParams(body.params)
+    ) {
+      console.log("BUNDLE CALL", body);
+    }
     // Else, if we did not receive a valid eth_sendBundle or the handlers did not find a transaction payload to modify,
     // simply forward the request to the FORWARD_URL.
     const response = await axios({
