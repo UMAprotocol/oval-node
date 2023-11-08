@@ -8,7 +8,7 @@ import morgan from "morgan";
 dotenv.config();
 
 import { toBigInt, Wallet, TransactionRequest, Contract, Transaction } from "ethers";
-import { createJSONRPCSuccessResponse, JSONRPCErrorException, isJSONRPCRequest, isJSONRPCID } from "json-rpc-2.0";
+import { createJSONRPCSuccessResponse, isJSONRPCRequest, isJSONRPCID } from "json-rpc-2.0";
 import { BundleParams } from "@flashbots/mev-share-client";
 import MevShareClient from "@flashbots/mev-share-client";
 
