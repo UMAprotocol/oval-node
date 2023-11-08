@@ -1,4 +1,6 @@
 import { Transaction } from "ethers";
+import { Request, Response, NextFunction } from "express";
+import { createJSONRPCErrorResponse, JSONRPCErrorException } from "json-rpc-2.0";
 import { env, copyAndDrop } from "../lib";
 
 // Sample bundle processor. Can be extended to handle different kinds of bundle decomposition. For now it
@@ -30,4 +32,16 @@ export function processBundle(transactions: string[]):
 
   // Don't return irrelevant parameters if nothing was found. Caller will have to check the boolean before accessing.
   return { foundOEVTransaction: false };
+}
+
+// Error handler that logs error and sends JSON-RPC error response.
+export function expressErrorHandler(err: Error, req: Request, res: Response, next: NextFunction) {
+  console.error(err.stack); // Log the error for debugging
+  if (err instanceof JSONRPCErrorException) {
+    res.status(200).send(createJSONRPCErrorResponse(req.body.id, err.code, err.message, err.data));
+  } else {
+    res
+      .status(200)
+      .send(createJSONRPCErrorResponse(req.body.id, -32603, "Internal error", `${err.name}: ${err.message}`));
+  }
 }
