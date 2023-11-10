@@ -1,9 +1,23 @@
-import { JsonRpcProvider, WebSocketProvider, Network, Wallet, Provider, isHexString, Transaction } from "ethers";
+import {
+  JsonRpcProvider,
+  WebSocketProvider,
+  Network,
+  Wallet,
+  Provider,
+  isHexString,
+  Transaction,
+  BigNumberish,
+} from "ethers";
 import MevShareClient from "@flashbots/mev-share-client";
+import { FlashbotsBundleProvider } from "flashbots-ethers-v6-provider-bundle";
 import { env } from "./env";
 
 export function getProvider() {
   return new JsonRpcProvider(env.providerUrl, new Network("mainnet", 1));
+}
+
+export async function getFlashbotsBundleProvider(provider: JsonRpcProvider, wallet: Wallet) {
+  return await FlashbotsBundleProvider.create(provider, wallet.connect(provider), env.forwardUrl);
 }
 
 export async function initWallet(provider: JsonRpcProvider | WebSocketProvider) {
@@ -74,4 +88,18 @@ export function isEthSendBundleParams(params: any): params is [{ txs: string[]; 
     params[0].txs.every((tx: any) => isValidTx(tx)) &&
     isHexString(params[0].blockNumber)
   );
+}
+
+export function convertBigintToString(obj: any): any {
+  if (obj !== null && typeof obj === "object") {
+    for (const key in obj) {
+      if (obj.hasOwnProperty(key)) {
+        if (typeof obj[key] === "bigint") {
+          obj[key] = obj[key].toString();
+        } else if (typeof obj[key] === "object") {
+          convertBigintToString(obj[key]);
+        }
+      }
+    }
+  }
 }

@@ -716,6 +716,11 @@ finalhandler@1.2.0:
     statuses "2.0.1"
     unpipe "~1.0.0"
 
+flashbots-ethers-v6-provider-bundle@^0.6.1:
+  version "0.6.1"
+  resolved "https://registry.yarnpkg.com/flashbots-ethers-v6-provider-bundle/-/flashbots-ethers-v6-provider-bundle-0.6.1.tgz#217ed5cee653c45ef6713813c932c43589f72fd4"
+  integrity sha512-plWHWdBMUtZvcsPtjnxdG7H80K973wvCYZwp0mQ4AO5p2scdzy7MqLhJIMLJqVs9IRmIkajme/W6cTIWXIOxzw==
+
 follow-redirects@^1.15.0:
   version "1.15.3"
   resolved "https://registry.yarnpkg.com/follow-redirects/-/follow-redirects-1.15.3.tgz#fe2f3ef2690afce7e82ed0b44db08165b207123a"

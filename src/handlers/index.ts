@@ -12,6 +12,7 @@ export function processBundle(transactions: string[]):
       foundOEVTransaction: true;
       oevShare: string;
       refundAddress: string;
+      droppedTransaction: string;
     }
   | { foundOEVTransaction: false } {
   for (const [index, tx] of transactions.entries()) {
@@ -26,6 +27,7 @@ export function processBundle(transactions: string[]):
         oevShare: env.oevOracle,
         refundAddress: env.refundAddress,
         processedTransactions: copyAndDrop(transactions, index),
+        droppedTransaction: transactions[index],
       };
     }
   }

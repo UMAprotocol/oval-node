@@ -9,10 +9,10 @@ dotenv.config();
 
 import { toBigInt, Wallet, TransactionRequest, Contract, Transaction } from "ethers";
 import { createJSONRPCSuccessResponse, isJSONRPCRequest, isJSONRPCID } from "json-rpc-2.0";
-import { BundleParams } from "@flashbots/mev-share-client";
-import MevShareClient from "@flashbots/mev-share-client";
+import MevShareClient, { BundleParams } from "@flashbots/mev-share-client";
+import { FlashbotsBundleProvider } from "flashbots-ethers-v6-provider-bundle";
 
-import { initWallet, getProvider, env, getBaseFee, isEthSendBundleParams } from "./lib";
+import { initWallet, getProvider, env, getBaseFee, isEthSendBundleParams, convertBigintToString } from "./lib";
 import { oevOracleAbi } from "./abi";
 import { expressErrorHandler, processBundle } from "./handlers";
 
@@ -88,7 +88,28 @@ app.post("/", async (req, res, next) => {
       body.method == "eth_callBundle" &&
       isEthSendBundleParams(body.params)
     ) {
-      console.log("BUNDLE CALL", body);
+      console.log("discovered tx for simulation modified payload! Sending unlock tx bundle via simulation...");
+      const targetBlock = parseInt(Number(body.params[0].blockNumber).toString());
+      const processResult = processBundle(body.params[0].txs);
+      if (processResult.foundOEVTransaction) {
+        const { oevShare, processedTransactions, droppedTransaction } = processResult;
+        const { wallet, mevshare } = await initWallet(provider);
+        const signedUnlockTx = await createUnlockLatestValueTx(wallet, oevShare);
+
+        const bundle: string[] = [droppedTransaction, signedUnlockTx, ...processedTransactions.map((tx): string => tx)];
+
+        console.log("bundle", bundle);
+
+        // TODO: we should not have an async blocker here like this, ideally.
+        const flashbotsBundleProvider = await FlashbotsBundleProvider.create(provider, wallet);
+
+        const simResult = await flashbotsBundleProvider.simulate(bundle, targetBlock);
+        console.log("simulation ran with output RAW", simResult);
+        convertBigintToString(simResult);
+        console.log("simulation ran with output", JSON.stringify(simResult));
+        res.status(200).send(createJSONRPCSuccessResponse(body.id, simResult));
+        return;
+      }
     }
     // Else, if we did not receive a valid eth_sendBundle or the handlers did not find a transaction payload to modify,
     // simply forward the request to the FORWARD_URL.
@@ -114,14 +135,7 @@ app.listen(3000, () => {
   console.log("Server is running on http://localhost:3000");
 });
 
-export const sendUnlockLatestValue = async (
-  wallet: Wallet,
-  mevshare: MevShareClient,
-  oevOracle: Contract,
-  targetBlock: number,
-  oevShare: string,
-  refundAddress: string,
-) => {
+export const createUnlockLatestValueTx = async (wallet: Wallet, oevShare: string) => {
   // Run concurrently to save a little time.
   const [nonce, baseFee, data, network] = await Promise.all([
     wallet.getNonce(),
@@ -131,7 +145,7 @@ export const sendUnlockLatestValue = async (
   ]);
 
   // Construct transaction to call unlockLatestValue on OEVShare Oracle from permissioned address.
-  const tx: TransactionRequest = {
+  const unlockTx: TransactionRequest = {
     type: 2,
     chainId: network.chainId,
     to: oevShare, // Target is OEVShare Oracle used in the demo.
@@ -144,12 +158,22 @@ export const sendUnlockLatestValue = async (
     maxPriorityFeePerGas: 0, // searcher should pay the full tip.
   };
 
-  const signedTx = await wallet.signTransaction(tx);
+  return await wallet.signTransaction(unlockTx);
+};
 
+export const sendUnlockLatestValue = async (
+  wallet: Wallet,
+  mevshare: MevShareClient,
+  oevOracle: Contract,
+  targetBlock: number,
+  oevShare: string,
+  refundAddress: string,
+) => {
+  const signedUnlockTx = await createUnlockLatestValueTx(wallet, oevShare);
   // Send this as a bundle. Define the max share hints and share 70% kickback to HoneyDao (demo contract).
   const bundleParams: BundleParams = {
     inclusion: { block: targetBlock, maxBlock: targetBlock + env.blockRangeSize },
-    body: [{ tx: signedTx, canRevert: false }],
+    body: [{ tx: signedUnlockTx, canRevert: false }],
     validity: {
       refundConfig: [
         {
@@ -183,7 +207,7 @@ export const sendUnlockLatestValue = async (
 
   console.log(`Unlock Latest Call bundle: ${JSON.stringify(bundleParams, null, 2)}`); // Pretty print JSON
   await mevshare.sendBundle(bundleParams);
-  const hash = Transaction.from(signedTx).hash;
+  const hash = Transaction.from(signedUnlockTx).hash;
   if (!hash) throw new Error("No hash in signed unlock transaction");
   return hash;
 };
