@@ -16,7 +16,7 @@ export const env = {
   providerUrl: getEnvVar("PROVIDER_URL"),
   senderKey: getEnvVar("SENDER_PRIVATE_KEY"),
   forwardUrl: getEnvVar("FORWARD_URL", fallback.forwardUrl),
-  oevOracle: getAddress(getEnvVar("OEV_ORACLE_ADDRESS", fallback.oevOracle)),
+  oevShareAddress: getAddress(getEnvVar("OEV_ORACLE_ADDRESS", fallback.oevShareAddress)),
   honeyPot: getAddress(getEnvVar("HONEYPOT_ADDRESS", fallback.honeyPot)),
   refundAddress: getAddress(getEnvVar("REFUND_ADDRESS", fallback.refundAddress)),
   blockRangeSize: getInt(getEnvVar("BLOCK_RANGE_SIZE", fallback.blockRangeSize)),

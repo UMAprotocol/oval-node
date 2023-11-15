@@ -1,4 +1,4 @@
-import express, { Request, Response, NextFunction } from "express";
+import express from "express";
 import bodyParser from "body-parser";
 import axios from "axios";
 import https from "https";
@@ -7,14 +7,14 @@ import morgan from "morgan";
 
 dotenv.config();
 
-import { toBigInt, Wallet, TransactionRequest, Contract, Transaction } from "ethers";
+import { Wallet, TransactionRequest, Contract, Transaction } from "ethers";
 import { createJSONRPCSuccessResponse, isJSONRPCRequest, isJSONRPCID } from "json-rpc-2.0";
 import { BundleParams } from "@flashbots/mev-share-client";
 import MevShareClient from "@flashbots/mev-share-client";
 
 import { initWallet, getProvider, env, getBaseFee, isEthSendBundleParams } from "./lib";
-import { oevOracleAbi } from "./abi";
-import { expressErrorHandler, processBundle } from "./handlers";
+import { oevShareAbi } from "./abi";
+import { expressErrorHandler } from "./handlers";
 
 const agent = new https.Agent({ rejectUnauthorized: false }); // this might not be needed (and might add security risks in prod).
 
@@ -23,7 +23,8 @@ app.use(bodyParser.json());
 app.use(morgan("tiny"));
 
 const provider = getProvider();
-const oevOracle = new Contract(env.oevOracle, oevOracleAbi);
+const { oevShareAddress, refundAddress } = env;
+const oevShare = new Contract(oevShareAddress, oevShareAbi);
 
 // Start restful API server to listen for root inbound post requests.
 app.post("/", async (req, res, next) => {
@@ -32,58 +33,52 @@ app.post("/", async (req, res, next) => {
     console.log(`\nReceived: ${method} ${url}`);
     console.log(`Body: ${JSON.stringify(body, null, 2)}`); // Pretty print JSON
 
-    // If the request is a valid JSON RPC 2.0 eth_sendBundle method, process the bundle. The process Bundle function will
-    // execute target specific modifications to the bundle depending on its structure.
+    // If the request is a valid JSON RPC 2.0 eth_sendBundle method, prepend the unlock transaction.
     if (
       isJSONRPCRequest(body) &&
       isJSONRPCID(body.id) &&
       body.method == "eth_sendBundle" &&
       isEthSendBundleParams(body.params)
     ) {
-      const processResult = processBundle(body.params[0].txs);
-      if (processResult.foundOEVTransaction) {
-        const { oevShare, refundAddress, processedTransactions } = processResult;
-        console.log("discovered tx & modified payload! Sending unlock tx bundle and backrun bundle...");
-        const targetBlock = parseInt(Number(body.params[0].blockNumber).toString());
+      console.log("discovered tx & modified payload! Sending unlock tx bundle and backrun bundle...");
+      const targetBlock = parseInt(Number(body.params[0].blockNumber).toString());
 
-        const { wallet, mevshare } = await initWallet(provider);
+      const { wallet, mevshare } = await initWallet(provider);
 
-        // Send the call to OEVShare to unlock the latest value.
-        const unlockTxHash = await sendUnlockLatestValue(
-          wallet,
-          mevshare,
-          oevOracle,
-          targetBlock,
-          oevShare,
-          refundAddress,
-        );
+      // Send the call to OEVShare to unlock the latest value.
+      const unlockTxHash = await sendUnlockLatestValue(
+        wallet,
+        mevshare,
+        oevShare,
+        targetBlock,
+        oevShareAddress,
+        refundAddress,
+      );
 
-        // Construct the bundle with the modified payload to backrun the UnlockLatestValue call.
-        const bundle: BundleParams["body"] = [
-          { hash: unlockTxHash },
-          ...processedTransactions.map((tx): { tx: string; canRevert: boolean } => {
-            return { tx, canRevert: false };
-          }),
-        ];
+      // Construct the bundle with the modified payload to backrun the UnlockLatestValue call.
+      const bundle: BundleParams["body"] = [
+        { hash: unlockTxHash },
+        ...body.params[0].txs.map((tx): { tx: string; canRevert: boolean } => {
+          return { tx, canRevert: false };
+        }),
+      ];
 
-        const bundleParams: BundleParams = {
-          inclusion: {
-            block: targetBlock,
-            maxBlock: targetBlock + env.blockRangeSize,
-          },
-          body: bundle,
-        };
+      const bundleParams: BundleParams = {
+        inclusion: {
+          block: targetBlock,
+          maxBlock: targetBlock + env.blockRangeSize,
+        },
+        body: bundle,
+      };
 
-        console.log(`Forwarded a bundle with the following BundleParams: ${JSON.stringify(bundleParams, null, 2)}`);
+      console.log(`Forwarded a bundle with the following BundleParams: ${JSON.stringify(bundleParams, null, 2)}`);
 
-        const backrunResult = await mevshare.sendBundle(bundleParams);
+      const backrunResult = await mevshare.sendBundle(bundleParams);
 
-        res.status(200).send(createJSONRPCSuccessResponse(body.id, backrunResult));
-        return; // Exit the function here to prevent the request from being forwarded to the FORWARD_URL.
-      }
+      res.status(200).send(createJSONRPCSuccessResponse(body.id, backrunResult));
+      return; // Exit the function here to prevent the request from being forwarded to the FORWARD_URL.
     }
-    // Else, if we did not receive a valid eth_sendBundle or the handlers did not find a transaction payload to modify,
-    // simply forward the request to the FORWARD_URL.
+    // Else, if we did not receive a valid eth_sendBundle, simply forward the request to the FORWARD_URL.
     const response = await axios({
       method: method as any,
       url: `${env.forwardUrl}`,
@@ -109,16 +104,16 @@ app.listen(3000, () => {
 export const sendUnlockLatestValue = async (
   wallet: Wallet,
   mevshare: MevShareClient,
-  oevOracle: Contract,
+  oevShare: Contract,
   targetBlock: number,
-  oevShare: string,
+  oevShareAddress: string,
   refundAddress: string,
 ) => {
   // Run concurrently to save a little time.
   const [nonce, baseFee, data, network] = await Promise.all([
     wallet.getNonce(),
     getBaseFee(provider),
-    oevOracle.interface.encodeFunctionData("unlockLatestValue"),
+    oevShare.interface.encodeFunctionData("unlockLatestValue"),
     provider.getNetwork(),
   ]);
 
@@ -126,7 +121,7 @@ export const sendUnlockLatestValue = async (
   const tx: TransactionRequest = {
     type: 2,
     chainId: network.chainId,
-    to: oevShare, // Target is OEVShare Oracle used in the demo.
+    to: oevShareAddress, // Target is OEVShare Oracle used in the demo.
     nonce,
     value: 0,
     gasLimit: 200000,
