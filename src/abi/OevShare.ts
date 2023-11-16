@@ -1,5 +1,5 @@
 // Todo: move to using typechain exports
-export const oevOracleAbi = [
+export const oevShareAbi = [
   {
     inputs: [
       { internalType: "address", name: "chainlinkSource", type: "address" },
