@@ -5,4 +5,16 @@ export const fallback = {
   forwardUrl: "https://relay.flashbots.net",
   blockRangeSize: "25",
   refundPercent: "75",
+  builders: [
+    "flashbots",
+    "f1b.io",
+    "rsync",
+    "beaverbuild.org",
+    "builder0x69",
+    "Titan",
+    "EigenPhi",
+    "boba-builder",
+    "Gambit Labs",
+    "payload",
+  ],
 } as const;
