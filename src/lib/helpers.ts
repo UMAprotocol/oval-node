@@ -47,6 +47,21 @@ export function getInt(input: string): number {
   return output;
 }
 
+export function getStringArray(input: string): string[] {
+  let output: unknown;
+  try {
+    output = JSON.parse(input);
+  } catch {
+    throw new Error(`Value ${input} cannot be converted to an array of strings`);
+  }
+
+  if (Array.isArray(output) && output.every((el: unknown): el is string => typeof el === "string")) {
+    return output;
+  }
+
+  throw new Error(`Value ${input} is valid JSON, but is not an array of strings`);
+}
+
 // Simple type guard to ensure check that a value is defined (and help typescript understand).
 export function isDefined<T>(input: T | null | undefined): input is T {
   return input !== null && input !== undefined;

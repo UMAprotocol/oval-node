@@ -69,6 +69,9 @@ app.post("/", async (req, res, next) => {
           maxBlock: targetBlock + env.blockRangeSize,
         },
         body: bundle,
+        privacy: {
+          builders: env.builders,
+        },
       };
 
       console.log(`Forwarded a bundle with the following BundleParams: ${JSON.stringify(bundleParams, null, 2)}`);
@@ -153,18 +156,7 @@ export const sendUnlockLatestValue = async (
         functionSelector: true,
         txHash: true,
       },
-      builders: [
-        "flashbots",
-        "f1b.io",
-        "rsync",
-        "beaverbuild.org",
-        "builder0x69",
-        "Titan",
-        "EigenPhi",
-        "boba-builder",
-        "Gambit Labs",
-        "payload",
-      ],
+      builders: env.builders,
     },
   };
 
