@@ -14,7 +14,7 @@ import MevShareClient from "@flashbots/mev-share-client";
 
 import { initWallet, getProvider, env, getBaseFee, isEthSendBundleParams } from "./lib";
 import { oevShareAbi } from "./abi";
-import { expressErrorHandler } from "./handlers";
+import { expressErrorHandler, logSimulationErrors } from "./handlers";
 
 const agent = new https.Agent({ rejectUnauthorized: false }); // this might not be needed (and might add security risks in prod).
 
@@ -43,10 +43,10 @@ app.post("/", async (req, res, next) => {
       console.log("discovered tx & modified payload! Sending unlock tx bundle and backrun bundle...");
       const targetBlock = parseInt(Number(body.params[0].blockNumber).toString());
 
-      const { wallet, mevshare } = await initWallet(provider);
+      const { wallet, mevshare, flashbotsBundleProvider } = await initWallet(provider);
 
       // Send the call to OEVShare to unlock the latest value.
-      const unlockTxHash = await sendUnlockLatestValue(
+      const { unlockTxHash, signedUnlockTx } = await sendUnlockLatestValue(
         wallet,
         mevshare,
         oevShare,
@@ -73,6 +73,10 @@ app.post("/", async (req, res, next) => {
           builders: env.builders,
         },
       };
+
+      // Currently we only log simulation errors for debugging. We still proceed with bundle submission as some errors
+      // can be recovered by the operator (e.g. provide funding to accounts).
+      await logSimulationErrors(flashbotsBundleProvider, [signedUnlockTx, ...body.params[0].txs],targetBlock);
 
       console.log(`Forwarded a bundle with the following BundleParams: ${JSON.stringify(bundleParams, null, 2)}`);
 
@@ -134,12 +138,12 @@ export const sendUnlockLatestValue = async (
     maxPriorityFeePerGas: 0, // searcher should pay the full tip.
   };
 
-  const signedTx = await wallet.signTransaction(tx);
+  const signedUnlockTx = await wallet.signTransaction(tx);
 
   // Send this as a bundle. Define the max share hints and share 70% kickback to HoneyDao (demo contract).
   const bundleParams: BundleParams = {
     inclusion: { block: targetBlock, maxBlock: targetBlock + env.blockRangeSize },
-    body: [{ tx: signedTx, canRevert: false }],
+    body: [{ tx: signedUnlockTx, canRevert: false }],
     validity: {
       refundConfig: [
         {
@@ -162,7 +166,7 @@ export const sendUnlockLatestValue = async (
 
   console.log(`Unlock Latest Call bundle: ${JSON.stringify(bundleParams, null, 2)}`); // Pretty print JSON
   await mevshare.sendBundle(bundleParams);
-  const hash = Transaction.from(signedTx).hash;
-  if (!hash) throw new Error("No hash in signed unlock transaction");
-  return hash;
+  const unlockTxHash = Transaction.from(signedUnlockTx).hash;
+  if (!unlockTxHash) throw new Error("No hash in signed unlock transaction");
+  return { unlockTxHash, signedUnlockTx };
 };
