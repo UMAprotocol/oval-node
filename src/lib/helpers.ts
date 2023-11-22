@@ -1,5 +1,6 @@
 import { JsonRpcProvider, WebSocketProvider, Network, Wallet, Provider, isHexString, Transaction } from "ethers";
 import MevShareClient from "@flashbots/mev-share-client";
+import { FlashbotsBundleProvider } from "flashbots-ethers-v6-provider-bundle";
 import { env } from "./env";
 
 export function getProvider() {
@@ -12,6 +13,7 @@ export async function initWallet(provider: JsonRpcProvider | WebSocketProvider) 
   return {
     wallet: new Wallet(env.senderKey).connect(provider),
     mevshare: MevShareClient.useEthereumMainnet(authSigner),
+    flashbotsBundleProvider: await FlashbotsBundleProvider.create(provider, authSigner),
   };
 }
 
