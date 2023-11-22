@@ -12,7 +12,7 @@ import { createJSONRPCSuccessResponse, isJSONRPCRequest, isJSONRPCID } from "jso
 import { BundleParams } from "@flashbots/mev-share-client";
 import MevShareClient from "@flashbots/mev-share-client";
 
-import { initWallet, getProvider, env, getBaseFee, isEthSendBundleParams } from "./lib";
+import { initWallet, getProvider, env, getBaseFee, isEthSendBundleParams, ExtendedBundleParams } from "./lib";
 import { oevShareAbi } from "./abi";
 import { expressErrorHandler, logSimulationErrors } from "./handlers";
 
@@ -140,15 +140,15 @@ export const sendUnlockLatestValue = async (
 
   const signedUnlockTx = await wallet.signTransaction(tx);
 
-  // Send this as a bundle. Define the max share hints and share 70% kickback to HoneyDao (demo contract).
-  const bundleParams: BundleParams = {
+  // Send this as a bundle. Define the max share hints and share kickback to HoneyDao (demo contract).
+  const bundleParams: ExtendedBundleParams = {
     inclusion: { block: targetBlock, maxBlock: targetBlock + env.blockRangeSize },
     body: [{ tx: signedUnlockTx, canRevert: false }],
     validity: {
       refundConfig: [
         {
           address: refundAddress,
-          percent: env.refundPercent,
+          percent: 100,
         },
       ],
     },
@@ -161,6 +161,7 @@ export const sendUnlockLatestValue = async (
         txHash: true,
       },
       builders: env.builders,
+      wantRefund: env.refundPercent,
     },
   };
 
