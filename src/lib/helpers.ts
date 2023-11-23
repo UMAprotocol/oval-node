@@ -2,6 +2,7 @@ import { JsonRpcProvider, WebSocketProvider, Network, Wallet, Provider, isHexStr
 import MevShareClient from "@flashbots/mev-share-client";
 import { FlashbotsBundleProvider } from "flashbots-ethers-v6-provider-bundle";
 import { env } from "./env";
+import { Logger } from "./logging";
 
 export function getProvider() {
   return new JsonRpcProvider(env.providerUrl, new Network("mainnet", 1));
@@ -22,7 +23,7 @@ export async function getBaseFee(provider: Provider) {
   const block = await provider.getBlock("latest");
   const baseFee = block?.baseFeePerGas;
   if (!isDefined(baseFee)) {
-    console.error(`Block did not contain base fee. Block received from provider ${block}`);
+    Logger.debug(`Block did not contain base fee. Block received from provider ${block}`);
     throw new Error(`Block did not contain base fee. Is this running on an EIP-1559 network?`);
   }
   return baseFee;

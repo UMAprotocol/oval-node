@@ -1,13 +1,15 @@
 import { Request, Response, NextFunction } from "express";
 import { FlashbotsBundleProvider } from "flashbots-ethers-v6-provider-bundle";
 import { createJSONRPCErrorResponse, JSONRPCErrorException } from "json-rpc-2.0";
+import { Logger } from "../lib";
 
 // Error handler that logs error and sends JSON-RPC error response.
 export function expressErrorHandler(err: Error, req: Request, res: Response, next: NextFunction) {
-  console.error(err.stack); // Log the error for debugging
   if (err instanceof JSONRPCErrorException) {
+    Logger.error("JSON-RPC error", { err });
     res.status(200).send(createJSONRPCErrorResponse(req.body.id, err.code, err.message, err.data));
   } else {
+    Logger.error("Internal error", { err });
     res
       .status(200)
       .send(createJSONRPCErrorResponse(req.body.id, -32603, "Internal error", `${err.name}: ${err.message}`));
@@ -22,8 +24,8 @@ export async function logSimulationErrors(
 ) {
   const simulationResponse = await flashbotsBundleProvider.simulate(signedTransactions, targetBlock);
   if ("error" in simulationResponse) {
-    console.error("Simulation error:", simulationResponse.error.message);
+    Logger.debug("Simulation error", { simulationResponse });
   } else if (simulationResponse.firstRevert && "error" in simulationResponse.firstRevert) {
-    console.error("Simulation reverted:", simulationResponse);
+    Logger.debug("Simulation reverted", { simulationResponse });
   }
 }
