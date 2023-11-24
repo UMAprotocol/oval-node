@@ -12,7 +12,7 @@ import { createJSONRPCSuccessResponse, isJSONRPCRequest, isJSONRPCID } from "jso
 import { BundleParams } from "@flashbots/mev-share-client";
 import MevShareClient from "@flashbots/mev-share-client";
 
-import { initWallet, getProvider, env, getBaseFee, isEthSendBundleParams, ExtendedBundleParams } from "./lib";
+import { initWallet, getProvider, env, getBaseFee, isEthSendBundleParams, ExtendedBundleParams, Logger } from "./lib";
 import { oevShareAbi } from "./abi";
 import { expressErrorHandler, logSimulationErrors } from "./handlers";
 
@@ -30,8 +30,7 @@ const oevShare = new Contract(oevShareAddress, oevShareAbi);
 app.post("/", async (req, res, next) => {
   try {
     const { url, method, body } = req;
-    console.log(`\nReceived: ${method} ${url}`);
-    console.log(`Body: ${JSON.stringify(body, null, 2)}`); // Pretty print JSON
+    Logger.debug(`Received: ${method} ${url}`, { body });
 
     // If the request is a valid JSON RPC 2.0 eth_sendBundle method, prepend the unlock transaction.
     if (
@@ -40,7 +39,8 @@ app.post("/", async (req, res, next) => {
       body.method == "eth_sendBundle" &&
       isEthSendBundleParams(body.params)
     ) {
-      console.log("discovered tx & modified payload! Sending unlock tx bundle and backrun bundle...");
+      Logger.debug("Discovered tx & modified payload! Sending unlock tx bundle and backrun bundle...", { body });
+
       const targetBlock = parseInt(Number(body.params[0].blockNumber).toString());
 
       const { wallet, mevshare, flashbotsBundleProvider } = await initWallet(provider);
@@ -76,9 +76,8 @@ app.post("/", async (req, res, next) => {
 
       // Currently we only log simulation errors for debugging. We still proceed with bundle submission as some errors
       // can be recovered by the operator (e.g. provide funding to accounts).
-      await logSimulationErrors(flashbotsBundleProvider, [signedUnlockTx, ...body.params[0].txs],targetBlock);
-
-      console.log(`Forwarded a bundle with the following BundleParams: ${JSON.stringify(bundleParams, null, 2)}`);
+      await logSimulationErrors(flashbotsBundleProvider, [signedUnlockTx, ...body.params[0].txs], targetBlock);
+      Logger.debug("Forwarded a bundle", { bundleParams });
 
       const backrunResult = await mevshare.sendBundle(bundleParams);
 
@@ -105,7 +104,7 @@ app.post("/", async (req, res, next) => {
 app.use(expressErrorHandler);
 
 app.listen(3000, () => {
-  console.log("Server is running on http://localhost:3000");
+  Logger.info("Server is running on http://localhost:3000");
 });
 
 export const sendUnlockLatestValue = async (
@@ -165,7 +164,7 @@ export const sendUnlockLatestValue = async (
     },
   };
 
-  console.log(`Unlock Latest Call bundle: ${JSON.stringify(bundleParams, null, 2)}`); // Pretty print JSON
+  Logger.debug("Unlock Latest Call bundle", { bundleParams });
   await mevshare.sendBundle(bundleParams);
   const unlockTxHash = Transaction.from(signedUnlockTx).hash;
   if (!unlockTxHash) throw new Error("No hash in signed unlock transaction");
