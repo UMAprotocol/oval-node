@@ -4,15 +4,15 @@ import { createJSONRPCErrorResponse, JSONRPCErrorException } from "json-rpc-2.0"
 import { Logger } from "../lib";
 
 // Error handler that logs error and sends JSON-RPC error response.
-export function expressErrorHandler(err: Error, req: Request, res: Response, next: NextFunction) {
-  if (err instanceof JSONRPCErrorException) {
-    Logger.error("JSON-RPC error", { err });
-    res.status(200).send(createJSONRPCErrorResponse(req.body.id, err.code, err.message, err.data));
+export function expressErrorHandler(error: Error, req: Request, res: Response, next: NextFunction) {
+  if (error instanceof JSONRPCErrorException) {
+    Logger.error("JSON-RPC error", { error });
+    res.status(200).send(createJSONRPCErrorResponse(req.body.id, error.code, error.message, error.data));
   } else {
-    Logger.error("Internal error", { err });
+    Logger.error("Internal error", { error });
     res
       .status(200)
-      .send(createJSONRPCErrorResponse(req.body.id, -32603, "Internal error", `${err.name}: ${err.message}`));
+      .send(createJSONRPCErrorResponse(req.body.id, -32603, "Internal error", `${error.name}: ${error.message}`));
   }
 }
 
