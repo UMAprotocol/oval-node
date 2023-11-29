@@ -6,10 +6,10 @@ import { Logger } from "../lib";
 // Error handler that logs error and sends JSON-RPC error response.
 export function expressErrorHandler(err: Error, req: Request, res: Response, next: NextFunction) {
   if (err instanceof JSONRPCErrorException) {
-    Logger.error("JSON-RPC error", { err });
+    Logger.error("JSON-RPC error", { error: err });
     res.status(200).send(createJSONRPCErrorResponse(req.body.id, err.code, err.message, err.data));
   } else {
-    Logger.error("Internal error", { err });
+    Logger.error("Internal error", { error: err });
     res
       .status(200)
       .send(createJSONRPCErrorResponse(req.body.id, -32603, "Internal error", `${err.name}: ${err.message}`));
