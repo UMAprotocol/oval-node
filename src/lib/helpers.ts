@@ -71,7 +71,7 @@ export function isDefined<T>(input: T | null | undefined): input is T {
 }
 
 // Helper function for bundle params type guard making sure all tx strings can be decoded.
-function isValidTx(tx: any) {
+function isValidTx(tx: unknown) {
   if (typeof tx !== "string") return false;
   try {
     Transaction.from(tx);
@@ -81,15 +81,53 @@ function isValidTx(tx: any) {
   }
 }
 
-// Type guard for params in eth_sendBundle method. We ignore all optional properties as we don't use them.
+// Type guard for params in eth_sendBundle method. We only support the required properties for RPC to work. Requests
+// with unsupported parameters will be forwarded to fallback relay.
 // Based on Flashbots RPC Endpont docs: https://docs.flashbots.net/flashbots-auction/advanced/rpc-endpoint#eth_sendbundle
-export function isEthSendBundleParams(params: any): params is [{ txs: string[]; blockNumber: string }] {
+export function isEthSendBundleParams(params: unknown): params is [{ txs: string[]; blockNumber: string }] {
   return (
     Array.isArray(params) &&
     params.length === 1 &&
     typeof params[0] === "object" &&
     Array.isArray(params[0].txs) &&
-    params[0].txs.every((tx: any) => isValidTx(tx)) &&
-    isHexString(params[0].blockNumber)
+    params[0].txs.every((tx: unknown) => isValidTx(tx)) &&
+    isHexString(params[0].blockNumber) &&
+    Object.keys(params[0]).every(key => ["txs", "blockNumber"].includes(key)) // Nothing else supported.
   );
+}
+
+// Type guard for params in eth_callBundle method. We only support the required properties for RPC to work. Requests
+// with unsupported parameters will be forwarded to fallback relay.
+// Based on Flashbots RPC Endpont docs: https://docs.flashbots.net/flashbots-auction/advanced/rpc-endpoint#eth_callbundle
+export function isEthCallBundleParams(
+  params: unknown,
+): params is [{ txs: string[]; blockNumber: string; stateBlockNumber: string }] {
+  return (
+    Array.isArray(params) &&
+    params.length === 1 &&
+    typeof params[0] === "object" &&
+    Array.isArray(params[0].txs) &&
+    params[0].txs.every((tx: unknown) => isValidTx(tx)) &&
+    isHexString(params[0].blockNumber) &&
+    params[0].stateBlockNumber === "latest" && // We only support latest as otherwise unlock nonce could be too high.
+    Object.keys(params[0]).every(key => ["txs", "blockNumber", "stateBlockNumber"].includes(key)) // Nothing else supported.
+  );
+}
+
+// Helper function to deal with bigints when logging or responding to the client.
+export function stringifyBigInts(obj: any): any {
+  if (typeof obj === "bigint") {
+    return obj.toString();
+  } else if (typeof obj === "object") {
+    if (Array.isArray(obj)) {
+      return obj.map((item) => stringifyBigInts(item));
+    } else {
+      const newObj: Record<string, any> = {};
+      for (const key in obj) {
+        newObj[key] = stringifyBigInts(obj[key]);
+      }
+      return newObj;
+    }
+  }
+  return obj;
 }
