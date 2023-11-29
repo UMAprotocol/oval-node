@@ -88,7 +88,7 @@ app.post("/", async (req, res, next) => {
         [signedUnlockTx, ...body.params[0].txs],
         targetBlock,
       );
-      await logSimulationErrors(simulationResponse);
+      logSimulationErrors(simulationResponse);
 
       Logger.debug("Forwarded a bundle to MEV-Share", { bundleParams });
 
@@ -115,7 +115,7 @@ app.post("/", async (req, res, next) => {
       );
 
       // Send back the simulation response without the unlock transaction.
-      await handleBundleSimulation(simulationResponse, unlockTxHash, req, res);
+      handleBundleSimulation(simulationResponse, unlockTxHash, req, res);
       return; // Exit the function here to prevent the request from being forwarded to the FORWARD_URL.
     }
     // Else, if we did not receive a valid eth_sendBundle or eth_callBundle, forward the request to the FORWARD_URL.

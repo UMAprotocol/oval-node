@@ -18,7 +18,7 @@ export function expressErrorHandler(err: Error, req: Request, res: Response, nex
 }
 
 // Bundle simulation handler that just logs errors for debugging.
-export async function logSimulationErrors(simulationResponse: SimulationResponse) {
+export function logSimulationErrors(simulationResponse: SimulationResponse) {
   if ("error" in simulationResponse) {
     Logger.debug("Simulation error", { simulationResponse });
   } else if (simulationResponse.firstRevert && "error" in simulationResponse.firstRevert) {
@@ -50,7 +50,7 @@ function removeUnlockFromSimulationResult(
 }
 
 // Bundle simulation handler that sends simulation response to the client without the unlock transaction.
-export async function handleBundleSimulation(
+export function handleBundleSimulation(
   simulationResponse: SimulationResponse,
   unlockTxHash: string,
   req: Request,
