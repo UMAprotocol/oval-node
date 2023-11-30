@@ -33,8 +33,8 @@ function removeUnlockFromSimulationResult(
   unlockTxHash: string,
 ): SimulationResponseSuccess {
   const results = simulationResponse.results.filter((txResponse) => txResponse.txHash !== unlockTxHash);
-  const coinbaseDiff = results.reduce((total, txResponse) => total + BigInt(txResponse.coinbaseDiff), BigInt(0));
-  const gasFees = results.reduce((total, txResponse) => total + BigInt(txResponse.gasFees), BigInt(0));
+  const coinbaseDiff = results.reduce((total, txResponse) => total + BigInt(txResponse.coinbaseDiff), 0n);
+  const gasFees = results.reduce((total, txResponse) => total + BigInt(txResponse.gasFees), 0n);
   const totalGasUsed = results.reduce((total, txResponse) => total + txResponse.gasUsed, 0);
 
   return {
