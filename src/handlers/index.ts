@@ -57,7 +57,7 @@ export function handleBundleSimulation(
   res: Response,
 ) {
   if ("error" in simulationResponse) {
-    Logger.debug("Simulation error", { simulationResponse });
+    Logger.info("Simulation error", { simulationResponse });
     if (simulationResponse.error.message.includes(unlockTxHash)) {
       // Mark as internal error if the prepended unlock tx was at fault.
       res.status(200).send(createJSONRPCErrorResponse(req.body.id, -32603, "Internal error"));
