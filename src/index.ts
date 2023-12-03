@@ -12,9 +12,18 @@ import { createJSONRPCSuccessResponse, isJSONRPCRequest, isJSONRPCID } from "jso
 import { BundleParams } from "@flashbots/mev-share-client";
 import MevShareClient from "@flashbots/mev-share-client";
 
-import { initWallet, getProvider, env, getBaseFee, isEthSendBundleParams, ExtendedBundleParams, Logger } from "./lib";
+import {
+  initWallet,
+  getProvider,
+  env,
+  getBaseFee,
+  isEthCallBundleParams,
+  isEthSendBundleParams,
+  ExtendedBundleParams,
+  Logger,
+} from "./lib";
 import { oevShareAbi } from "./abi";
-import { expressErrorHandler, logSimulationErrors } from "./handlers";
+import { expressErrorHandler, handleBundleSimulation, logSimulationErrors } from "./handlers";
 
 const agent = new https.Agent({ rejectUnauthorized: false }); // this might not be needed (and might add security risks in prod).
 
@@ -39,7 +48,7 @@ app.post("/", async (req, res, next) => {
       body.method == "eth_sendBundle" &&
       isEthSendBundleParams(body.params)
     ) {
-      Logger.debug("Discovered tx & modified payload! Sending unlock tx bundle and backrun bundle...", { body });
+      Logger.debug("Received eth_sendBundle request! Sending unlock tx bundle and backrun bundle...", { body });
 
       const targetBlock = parseInt(Number(body.params[0].blockNumber).toString());
 
@@ -51,7 +60,6 @@ app.post("/", async (req, res, next) => {
         mevshare,
         oevShare,
         targetBlock,
-        oevShareAddress,
         refundAddress,
       );
 
@@ -74,17 +82,44 @@ app.post("/", async (req, res, next) => {
         },
       };
 
-      // Currently we only log simulation errors for debugging. We still proceed with bundle submission as some errors
-      // can be recovered by the operator (e.g. provide funding to accounts).
-      await logSimulationErrors(flashbotsBundleProvider, [signedUnlockTx, ...body.params[0].txs], targetBlock);
-      Logger.debug("Forwarded a bundle", { bundleParams });
+      // We only log simulation errors for debugging, but proceed with bundle submission as the client is expected to
+      // have simulated the bundle before broadcasting it.
+      const simulationResponse = await flashbotsBundleProvider.simulate(
+        [signedUnlockTx, ...body.params[0].txs],
+        targetBlock,
+      );
+      logSimulationErrors(simulationResponse);
 
       const backrunResult = await mevshare.sendBundle(bundleParams);
 
+      Logger.debug("Forwarded a bundle to MEV-Share", { bundleParams });
+
       res.status(200).send(createJSONRPCSuccessResponse(body.id, backrunResult));
       return; // Exit the function here to prevent the request from being forwarded to the FORWARD_URL.
+    } else if (
+      isJSONRPCRequest(body) &&
+      isJSONRPCID(body.id) &&
+      body.method == "eth_callBundle" &&
+      isEthCallBundleParams(body.params)
+    ) {
+      Logger.debug("Received eth_callBundle request! Simulating unlock tx and backrun bundle...", { body });
+
+      const { wallet, flashbotsBundleProvider } = await initWallet(provider);
+
+      // Sign the call to OEVShare to unlock the latest value.
+      const { unlockTxHash, signedUnlockTx } = await createUnlockLatestValueTx(wallet, oevShare);
+
+      const simulationResponse = await flashbotsBundleProvider.simulate(
+        [signedUnlockTx, ...body.params[0].txs],
+        body.params[0].blockNumber,
+      );
+
+      // Send back the simulation response without the unlock transaction.
+      handleBundleSimulation(simulationResponse, unlockTxHash, req, res);
+      return; // Exit the function here to prevent the request from being forwarded to the FORWARD_URL.
     }
-    // Else, if we did not receive a valid eth_sendBundle, simply forward the request to the FORWARD_URL.
+    // Else, if we did not receive a valid eth_sendBundle or eth_callBundle, forward the request to the FORWARD_URL.
+    Logger.debug(`Received unsupported request! Forwarding to ${env.forwardUrl} ...`, { body });
     const response = await axios({
       method: method as any,
       url: `${env.forwardUrl}`,
@@ -107,24 +142,18 @@ app.listen(3000, () => {
   Logger.info("Server is running on http://localhost:3000");
 });
 
-export const sendUnlockLatestValue = async (
-  wallet: Wallet,
-  mevshare: MevShareClient,
-  oevShare: Contract,
-  targetBlock: number,
-  oevShareAddress: string,
-  refundAddress: string,
-) => {
+const createUnlockLatestValueTx = async (wallet: Wallet, oevShare: Contract) => {
   // Run concurrently to save a little time.
-  const [nonce, baseFee, data, network] = await Promise.all([
+  const [nonce, baseFee, data, network, oevShareAddress] = await Promise.all([
     wallet.getNonce(),
     getBaseFee(provider),
     oevShare.interface.encodeFunctionData("unlockLatestValue"),
     provider.getNetwork(),
+    oevShare.getAddress(),
   ]);
 
   // Construct transaction to call unlockLatestValue on OEVShare Oracle from permissioned address.
-  const tx: TransactionRequest = {
+  const unlockTx: TransactionRequest = {
     type: 2,
     chainId: network.chainId,
     to: oevShareAddress, // Target is OEVShare Oracle used in the demo.
@@ -137,7 +166,22 @@ export const sendUnlockLatestValue = async (
     maxPriorityFeePerGas: 0, // searcher should pay the full tip.
   };
 
-  const signedUnlockTx = await wallet.signTransaction(tx);
+  const signedUnlockTx = await wallet.signTransaction(unlockTx);
+
+  const unlockTxHash = Transaction.from(signedUnlockTx).hash;
+  if (!unlockTxHash) throw new Error("No hash in signed unlock transaction");
+
+  return { unlockTxHash, signedUnlockTx };
+};
+
+const sendUnlockLatestValue = async (
+  wallet: Wallet,
+  mevshare: MevShareClient,
+  oevShare: Contract,
+  targetBlock: number,
+  refundAddress: string,
+) => {
+  const { unlockTxHash, signedUnlockTx } = await createUnlockLatestValueTx(wallet, oevShare);
 
   // Send this as a bundle. Define the max share hints and share kickback to HoneyDao (demo contract).
   const bundleParams: ExtendedBundleParams = {
@@ -166,7 +210,5 @@ export const sendUnlockLatestValue = async (
 
   Logger.debug("Unlock Latest Call bundle", { bundleParams });
   await mevshare.sendBundle(bundleParams);
-  const unlockTxHash = Transaction.from(signedUnlockTx).hash;
-  if (!unlockTxHash) throw new Error("No hash in signed unlock transaction");
   return { unlockTxHash, signedUnlockTx };
 };
