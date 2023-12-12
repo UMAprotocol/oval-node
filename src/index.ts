@@ -22,7 +22,7 @@ import {
   ExtendedBundleParams,
   Logger,
 } from "./lib";
-import { oevShareAbi } from "./abi";
+import { ovalAbi } from "./abi";
 import { expressErrorHandler, handleBundleSimulation, logSimulationErrors } from "./handlers";
 
 const agent = new https.Agent({ rejectUnauthorized: false }); // this might not be needed (and might add security risks in prod).
@@ -32,8 +32,8 @@ app.use(bodyParser.json());
 app.use(morgan("tiny"));
 
 const provider = getProvider();
-const { oevShareAddress, refundAddress } = env;
-const oevShare = new Contract(oevShareAddress, oevShareAbi);
+const { ovalAddress, refundAddress } = env;
+const oval = new Contract(ovalAddress, ovalAbi);
 
 // Start restful API server to listen for root inbound post requests.
 app.post("/", async (req, res, next) => {
@@ -54,11 +54,11 @@ app.post("/", async (req, res, next) => {
 
       const { wallet, mevshare, flashbotsBundleProvider } = await initWallet(provider);
 
-      // Send the call to OEVShare to unlock the latest value.
+      // Send the call to OVAL to unlock the latest value.
       const { unlockTxHash, signedUnlockTx } = await sendUnlockLatestValue(
         wallet,
         mevshare,
-        oevShare,
+        oval,
         targetBlock,
         refundAddress,
       );
@@ -106,8 +106,8 @@ app.post("/", async (req, res, next) => {
 
       const { wallet, flashbotsBundleProvider } = await initWallet(provider);
 
-      // Sign the call to OEVShare to unlock the latest value.
-      const { unlockTxHash, signedUnlockTx } = await createUnlockLatestValueTx(wallet, oevShare);
+      // Sign the call to OVAL to unlock the latest value.
+      const { unlockTxHash, signedUnlockTx } = await createUnlockLatestValueTx(wallet, oval);
 
       const simulationResponse = await flashbotsBundleProvider.simulate(
         [signedUnlockTx, ...body.params[0].txs],
@@ -142,21 +142,21 @@ app.listen(3000, () => {
   Logger.info("Server is running on http://localhost:3000");
 });
 
-const createUnlockLatestValueTx = async (wallet: Wallet, oevShare: Contract) => {
+const createUnlockLatestValueTx = async (wallet: Wallet, oval: Contract) => {
   // Run concurrently to save a little time.
-  const [nonce, baseFee, data, network, oevShareAddress] = await Promise.all([
+  const [nonce, baseFee, data, network, ovalAddress] = await Promise.all([
     wallet.getNonce(),
     getBaseFee(provider),
-    oevShare.interface.encodeFunctionData("unlockLatestValue"),
+    oval.interface.encodeFunctionData("unlockLatestValue"),
     provider.getNetwork(),
-    oevShare.getAddress(),
+    oval.getAddress(),
   ]);
 
-  // Construct transaction to call unlockLatestValue on OEVShare Oracle from permissioned address.
+  // Construct transaction to call unlockLatestValue on OVAL Oracle from permissioned address.
   const unlockTx: TransactionRequest = {
     type: 2,
     chainId: network.chainId,
-    to: oevShareAddress, // Target is OEVShare Oracle used in the demo.
+    to: ovalAddress, // Target is OVAL Oracle used in the demo.
     nonce,
     value: 0,
     gasLimit: 200000,
@@ -177,11 +177,11 @@ const createUnlockLatestValueTx = async (wallet: Wallet, oevShare: Contract) => 
 const sendUnlockLatestValue = async (
   wallet: Wallet,
   mevshare: MevShareClient,
-  oevShare: Contract,
+  oval: Contract,
   targetBlock: number,
   refundAddress: string,
 ) => {
-  const { unlockTxHash, signedUnlockTx } = await createUnlockLatestValueTx(wallet, oevShare);
+  const { unlockTxHash, signedUnlockTx } = await createUnlockLatestValueTx(wallet, oval);
 
   // Send this as a bundle. Define the max share hints and share kickback to HoneyDao (demo contract).
   const bundleParams: ExtendedBundleParams = {
