@@ -54,7 +54,7 @@ app.post("/", async (req, res, next) => {
 
       const { wallet, mevshare, flashbotsBundleProvider } = await initWallet(provider);
 
-      // Send the call to OVAL to unlock the latest value.
+      // Send the call to Oval to unlock the latest value.
       const { unlockTxHash, signedUnlockTx } = await sendUnlockLatestValue(
         wallet,
         mevshare,
@@ -106,7 +106,7 @@ app.post("/", async (req, res, next) => {
 
       const { wallet, flashbotsBundleProvider } = await initWallet(provider);
 
-      // Sign the call to OVAL to unlock the latest value.
+      // Sign the call to Oval to unlock the latest value.
       const { unlockTxHash, signedUnlockTx } = await createUnlockLatestValueTx(wallet, oval);
 
       const simulationResponse = await flashbotsBundleProvider.simulate(
@@ -152,11 +152,11 @@ const createUnlockLatestValueTx = async (wallet: Wallet, oval: Contract) => {
     oval.getAddress(),
   ]);
 
-  // Construct transaction to call unlockLatestValue on OVAL Oracle from permissioned address.
+  // Construct transaction to call unlockLatestValue on Oval Oracle from permissioned address.
   const unlockTx: TransactionRequest = {
     type: 2,
     chainId: network.chainId,
-    to: ovalAddress, // Target is OVAL Oracle used in the demo.
+    to: ovalAddress, // Target is Oval Oracle used in the demo.
     nonce,
     value: 0,
     gasLimit: 200000,
