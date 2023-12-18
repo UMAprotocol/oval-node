@@ -1,7 +1,5 @@
 import express from "express";
 import bodyParser from "body-parser";
-import axios from "axios";
-import https from "https";
 import dotenv from "dotenv";
 import morgan from "morgan";
 
@@ -23,9 +21,7 @@ import {
   Logger,
 } from "./lib";
 import { oevShareAbi } from "./abi";
-import { expressErrorHandler, handleBundleSimulation, logSimulationErrors } from "./handlers";
-
-const agent = new https.Agent({ rejectUnauthorized: false }); // this might not be needed (and might add security risks in prod).
+import { expressErrorHandler, handleBundleSimulation, handleUnsupportedRequest, logSimulationErrors } from "./handlers";
 
 const app = express();
 app.use(bodyParser.json());
@@ -95,7 +91,6 @@ app.post("/", async (req, res, next) => {
       Logger.debug("Forwarded a bundle to MEV-Share", { bundleParams });
 
       res.status(200).send(createJSONRPCSuccessResponse(body.id, backrunResult));
-      return; // Exit the function here to prevent the request from being forwarded to the FORWARD_URL.
     } else if (
       isJSONRPCRequest(body) &&
       isJSONRPCID(body.id) &&
@@ -116,21 +111,7 @@ app.post("/", async (req, res, next) => {
 
       // Send back the simulation response without the unlock transaction.
       handleBundleSimulation(simulationResponse, unlockTxHash, req, res);
-      return; // Exit the function here to prevent the request from being forwarded to the FORWARD_URL.
-    }
-    // Else, if we did not receive a valid eth_sendBundle or eth_callBundle, forward the request to the FORWARD_URL.
-    Logger.debug(`Received unsupported request! Forwarding to ${env.forwardUrl} ...`, { body });
-    const response = await axios({
-      method: method as any,
-      url: `${env.forwardUrl}`,
-      headers: { ...req.headers, host: new URL(env.forwardUrl).hostname },
-      data: body,
-      httpsAgent: agent,
-    });
-
-    const { status, data } = response;
-
-    res.status(status).send(data);
+    } else await handleUnsupportedRequest(req, res);
   } catch (error) {
     next(error);
   }

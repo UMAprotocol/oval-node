@@ -1,8 +1,12 @@
+import axios from "axios";
 import { Request, Response, NextFunction } from "express";
 import { keccak256, concat } from "ethers";
 import { SimulationResponse, SimulationResponseSuccess } from "flashbots-ethers-v6-provider-bundle";
 import { createJSONRPCErrorResponse, createJSONRPCSuccessResponse, JSONRPCErrorException } from "json-rpc-2.0";
-import { Logger, stringifyBigInts } from "../lib";
+import https from "https";
+import { env, Logger, stringifyBigInts } from "../lib";
+
+const agent = new https.Agent({ rejectUnauthorized: false }); // this might not be needed (and might add security risks in prod).
 
 // Error handler that logs error and sends JSON-RPC error response.
 export function expressErrorHandler(err: Error, req: Request, res: Response, next: NextFunction) {
@@ -72,4 +76,22 @@ export function handleBundleSimulation(
     const clientSimulationResult = removeUnlockFromSimulationResult(simulationResponse, unlockTxHash);
     res.status(200).send(createJSONRPCSuccessResponse(req.body.id, stringifyBigInts(clientSimulationResult)));
   }
+}
+
+// Handler that passes unsupported requests to the forwardUrl.
+export async function handleUnsupportedRequest(req: Request, res: Response) {
+  const { method, body } = req;
+
+  Logger.debug(`Received unsupported request! Forwarding to ${env.forwardUrl} ...`, { body });
+  const response = await axios({
+    method: method as any,
+    url: `${env.forwardUrl}`,
+    headers: { ...req.headers, host: new URL(env.forwardUrl).hostname },
+    data: body,
+    httpsAgent: agent,
+  });
+
+  const { status, data } = response;
+
+  res.status(status).send(data);
 }
