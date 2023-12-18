@@ -21,7 +21,13 @@ import {
   Logger,
 } from "./lib";
 import { oevShareAbi } from "./abi";
-import { expressErrorHandler, handleBundleSimulation, handleUnsupportedRequest, logSimulationErrors } from "./handlers";
+import {
+  expressErrorHandler,
+  handleBundleSimulation,
+  handleUnsupportedRequest,
+  logSimulationErrors,
+  originalBundleReverts,
+} from "./handlers";
 
 const app = express();
 app.use(bodyParser.json());
@@ -44,11 +50,20 @@ app.post("/", async (req, res, next) => {
       body.method == "eth_sendBundle" &&
       isEthSendBundleParams(body.params)
     ) {
-      Logger.debug("Received eth_sendBundle request! Sending unlock tx bundle and backrun bundle...", { body });
+      Logger.debug("Received eth_sendBundle request!", { body });
 
       const targetBlock = parseInt(Number(body.params[0].blockNumber).toString());
 
       const { wallet, mevshare, flashbotsBundleProvider } = await initWallet(provider);
+
+      // Simulate the original bundle to check if it reverts without the unlock.
+      const originalSimulationResponse = await flashbotsBundleProvider.simulate(body.params[0].txs, targetBlock);
+      if (!originalBundleReverts(originalSimulationResponse)) {
+        await handleUnsupportedRequest(req, res); // Pass through if the original bundle doesn't revert.
+        return;
+      }
+
+      Logger.debug("Sending unlock tx bundle and backrun bundle...");
 
       // Send the call to OEVShare to unlock the latest value.
       const { unlockTxHash, signedUnlockTx } = await sendUnlockLatestValue(

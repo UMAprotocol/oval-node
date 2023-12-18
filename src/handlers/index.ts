@@ -95,3 +95,15 @@ export async function handleUnsupportedRequest(req: Request, res: Response) {
 
   res.status(status).send(data);
 }
+
+// Helper to check if the original bundle reverts without the unlock and logs for debugging.
+export function originalBundleReverts(simulationResponse: SimulationResponse) {
+  if ("error" in simulationResponse) {
+    Logger.debug("Original bundle simulation error", { simulationResponse });
+    return false;
+  } else if (!simulationResponse.firstRevert || !("error" in simulationResponse.firstRevert)) {
+    Logger.debug("Original bundle simulation succeeds without unlock", stringifyBigInts({ simulationResponse }));
+    return false;
+  }
+  return true;
+}
