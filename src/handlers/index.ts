@@ -21,15 +21,6 @@ export function expressErrorHandler(err: Error, req: Request, res: Response, nex
   }
 }
 
-// Bundle simulation handler that just logs errors for debugging.
-export function logSimulationErrors(simulationResponse: SimulationResponse) {
-  if ("error" in simulationResponse) {
-    Logger.debug("Simulation error", { simulationResponse });
-  } else if (simulationResponse.firstRevert && "error" in simulationResponse.firstRevert) {
-    Logger.debug("Simulation reverted", stringifyBigInts({ simulationResponse }));
-  }
-}
-
 // Helper to remove unlock transaction from the simulation response and recalculate bundle totals.
 // Logic based on CallBundle function implementation in https://github.com/flashbots/builder/blob/main/internal/ethapi/api.go
 function removeUnlockFromSimulationResult(
