@@ -7,7 +7,7 @@ import morgan from "morgan";
 
 dotenv.config();
 
-import { Wallet, TransactionRequest, Contract, Transaction } from "ethers";
+import { keccak256, Wallet, TransactionRequest, Contract, Transaction } from "ethers";
 import { createJSONRPCSuccessResponse, isJSONRPCRequest, isJSONRPCID } from "json-rpc-2.0";
 import { BundleParams } from "@flashbots/mev-share-client";
 import MevShareClient from "@flashbots/mev-share-client";
@@ -55,7 +55,7 @@ app.post("/", async (req, res, next) => {
       const { wallet, mevshare, flashbotsBundleProvider } = await initWallet(provider);
 
       // Send the call to Oval to unlock the latest value.
-      const { unlockTxHash, signedUnlockTx } = await sendUnlockLatestValue(
+      const { unlockBundleHash, signedUnlockTx } = await sendUnlockLatestValue(
         wallet,
         mevshare,
         oval,
@@ -65,7 +65,7 @@ app.post("/", async (req, res, next) => {
 
       // Construct the bundle with the modified payload to backrun the UnlockLatestValue call.
       const bundle: BundleParams["body"] = [
-        { hash: unlockTxHash },
+        { hash: unlockBundleHash },
         ...body.params[0].txs.map((tx): { tx: string; canRevert: boolean } => {
           return { tx, canRevert: false };
         }),
@@ -210,5 +210,9 @@ const sendUnlockLatestValue = async (
 
   Logger.debug("Unlock Latest Call bundle", { bundleParams });
   await mevshare.sendBundle(bundleParams);
-  return { unlockTxHash, signedUnlockTx };
+
+  // MEV-Share is now referencing bundle hash as double hash of the transaction.
+  const unlockBundleHash = keccak256(unlockTxHash);
+
+  return { unlockBundleHash, signedUnlockTx };
 };
