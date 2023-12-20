@@ -33,7 +33,7 @@ export const env = {
   ovalConfigs: getOvalConfigs(getEnvVar("OVAL_CONFIGS", stringifiedFallbackOvalConfigs)),
   senderKey: getEnvVar("SENDER_PRIVATE_KEY"),
   forwardUrl: getEnvVar("FORWARD_URL", fallback.forwardUrl),
-  oevShareAddress: getAddress(getEnvVar("OEV_ORACLE_ADDRESS", fallback.oevShareAddress)),
+  ovalAddress: getAddress(getEnvVar("OVAL_ADDRESS", fallback.ovalAddress)),
   honeyPot: getAddress(getEnvVar("HONEYPOT_ADDRESS", fallback.honeyPot)),
   refundAddress: getAddress(getEnvVar("REFUND_ADDRESS", fallback.refundAddress)),
   blockRangeSize: getInt(getEnvVar("BLOCK_RANGE_SIZE", fallback.blockRangeSize)),

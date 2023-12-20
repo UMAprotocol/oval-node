@@ -22,7 +22,7 @@ import {
   ExtendedBundleParams,
   Logger,
 } from "./lib";
-import { oevShareAbi } from "./abi";
+import { ovalAbi } from "./abi";
 import {
   expressErrorHandler,
   handleBundleSimulation,
@@ -37,7 +37,7 @@ app.use(morgan("tiny"));
 const provider = getProvider();
 const unlockerWallets = initWallets(provider);
 const { ovalConfigs } = env;
-const ovalInterface = Interface.from(oevShareAbi);
+const ovalInterface = Interface.from(ovalAbi);
 
 // Start restful API server to listen for root inbound post requests.
 app.post("/", async (req, res, next) => {
@@ -169,7 +169,7 @@ const createUnlockLatestValueTx = async (
 ) => {
   const nonce = await wallet.getNonce();
 
-  // Construct transaction to call unlockLatestValue on Oval from permissioned address.
+  // Construct transaction to call unlockLatestValue on Oval Oracle from permissioned address.
   const unlockTx: TransactionRequest = {
     type: 2,
     chainId,
