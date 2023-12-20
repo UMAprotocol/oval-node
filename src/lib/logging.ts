@@ -26,7 +26,7 @@ export class Logger {
 
   static getLogBody(message: string, ...args: { [key: string]: any }[]): { [key: string]: any } {
     return {
-      at: "OVAL-RPC",
+      at: "Oval-RPC",
       message,
       ...Object.assign({}, ...args),
     };
