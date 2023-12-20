@@ -89,7 +89,7 @@ app.post("/", async (req, res, next) => {
       // Construct the bundle with the modified payload to backrun the UnlockLatestValue call.
       const bundle: BundleParams["body"] = [
         { hash: unlock.unlockBundleHash },
-        ...body.params[0].txs.map((tx): { tx: string; canRevert: boolean } => {
+        ...backrunTxs.map((tx): { tx: string; canRevert: boolean } => {
           return { tx, canRevert: false };
         }),
       ];
