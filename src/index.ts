@@ -5,7 +5,7 @@ import morgan from "morgan";
 
 dotenv.config();
 
-import { Wallet, TransactionRequest, Interface, Transaction } from "ethers";
+import { keccak256, Wallet, TransactionRequest, Interface, Transaction } from "ethers";
 import { FlashbotsBundleProvider } from "flashbots-ethers-v6-provider-bundle";
 import { createJSONRPCSuccessResponse, isJSONRPCRequest, isJSONRPCID } from "json-rpc-2.0";
 import { BundleParams } from "@flashbots/mev-share-client";
@@ -88,7 +88,7 @@ app.post("/", async (req, res, next) => {
 
       // Construct the bundle with the modified payload to backrun the UnlockLatestValue call.
       const bundle: BundleParams["body"] = [
-        { hash: unlock.unlockTxHash },
+        { hash: unlock.unlockBundleHash },
         ...body.params[0].txs.map((tx): { tx: string; canRevert: boolean } => {
           return { tx, canRevert: false };
         }),
@@ -213,7 +213,10 @@ const findUnlock = async (
 
       const simulationResponse = await flashbotsBundleProvider.simulate([signedUnlockTx, ...backrunTxs], targetBlock);
 
-      return { ovalAddress, unlockTxHash, signedUnlockTx, simulationResponse };
+      // MEV-Share is now referencing bundle hash as double hash of the transaction.
+      const unlockBundleHash = keccak256(unlockTxHash);
+
+      return { ovalAddress, unlockBundleHash, unlockTxHash, signedUnlockTx, simulationResponse };
     }),
   );
 
