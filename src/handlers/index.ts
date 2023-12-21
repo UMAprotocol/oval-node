@@ -3,10 +3,7 @@ import { Request, Response, NextFunction } from "express";
 import { keccak256, concat } from "ethers";
 import { SimulationResponse, SimulationResponseSuccess } from "flashbots-ethers-v6-provider-bundle";
 import { createJSONRPCErrorResponse, createJSONRPCSuccessResponse, JSONRPCErrorException } from "json-rpc-2.0";
-import https from "https";
 import { env, Logger, stringifyBigInts } from "../lib";
-
-const agent = new https.Agent({ rejectUnauthorized: false }); // this might not be needed (and might add security risks in prod).
 
 // Error handler that logs error and sends JSON-RPC error response.
 export function expressErrorHandler(err: Error, req: Request, res: Response, next: NextFunction) {
@@ -79,7 +76,6 @@ export async function handleUnsupportedRequest(req: Request, res: Response) {
     url: `${env.forwardUrl}`,
     headers: { ...req.headers, host: new URL(env.forwardUrl).hostname },
     data: body,
-    httpsAgent: agent,
   });
 
   const { status, data } = response;
