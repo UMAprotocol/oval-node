@@ -11,9 +11,9 @@ export function getProvider() {
 
 // Initialize unlocker wallets for each Oval instance.
 export function initWallets(provider: JsonRpcProvider) {
-  return Object.keys(env.ovalConfigs).reduce(
-    (wallets, address) => {
-      wallets[address] = new Wallet(env.ovalConfigs[address].unlockerKey).connect(provider);
+  return Object.entries(env.ovalConfigs).reduce(
+    (wallets, [address, config]) => {
+      wallets[address] = new Wallet(config.unlockerKey).connect(provider);
       return wallets;
     },
     {} as Record<string, Wallet>,
