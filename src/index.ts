@@ -8,7 +8,7 @@ import morgan from "morgan";
 dotenv.config();
 
 import { keccak256, Wallet, TransactionRequest, Contract, Transaction } from "ethers";
-import { createJSONRPCSuccessResponse, isJSONRPCRequest, isJSONRPCID, JSONRPCErrorException } from "json-rpc-2.0";
+import { createJSONRPCErrorResponse, createJSONRPCSuccessResponse, isJSONRPCRequest, isJSONRPCID } from "json-rpc-2.0";
 import { BundleParams } from "@flashbots/mev-share-client";
 import MevShareClient from "@flashbots/mev-share-client";
 
@@ -43,8 +43,11 @@ app.post("/", async (req, res, next) => {
 
     // If the request is a valid JSON RPC 2.0 eth_sendBundle method, prepend the unlock transaction.
     if (isJSONRPCRequest(body) && isJSONRPCID(body.id) && body.method == "eth_sendBundle") {
-      if (!isEthSendBundleParams(body.params))
-        throw new JSONRPCErrorException("Unsupported eth_sendBundle params", -32000, body.params);
+      if (!isEthSendBundleParams(body.params)) {
+        Logger.info("Received unsupported eth_sendBundle request!", { body });
+        res.status(200).send(createJSONRPCErrorResponse(req.body.id, -32000, "Unsupported eth_sendBundle params"));
+        return;
+      }
 
       Logger.debug("Received eth_sendBundle request! Sending unlock tx bundle and backrun bundle...", { body });
 
@@ -95,8 +98,11 @@ app.post("/", async (req, res, next) => {
       res.status(200).send(createJSONRPCSuccessResponse(body.id, backrunResult));
       return; // Exit the function here to prevent the request from being forwarded to the FORWARD_URL.
     } else if (isJSONRPCRequest(body) && isJSONRPCID(body.id) && body.method == "eth_callBundle") {
-      if (!isEthCallBundleParams(body.params))
-        throw new JSONRPCErrorException("Unsupported eth_callBundle params", -32000, body.params);
+      if (!isEthCallBundleParams(body.params)) {
+        Logger.info("Received unsupported eth_callBundle request!", { body });
+        res.status(200).send(createJSONRPCErrorResponse(req.body.id, -32000, "Unsupported eth_callBundle params"));
+        return;
+      }
 
       Logger.debug("Received eth_callBundle request! Simulating unlock tx and backrun bundle...", { body });
 
