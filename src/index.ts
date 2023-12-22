@@ -74,7 +74,7 @@ app.post("/", async (req, res, next) => {
       const bundleParams: BundleParams = {
         inclusion: {
           block: targetBlock,
-          maxBlock: targetBlock + env.blockRangeSize,
+          maxBlock: targetBlock,
         },
         body: bundle,
         privacy: {
@@ -185,7 +185,7 @@ const sendUnlockLatestValue = async (
 
   // Send this as a bundle. Define the max share hints and share kickback to HoneyDao (demo contract).
   const bundleParams: ExtendedBundleParams = {
-    inclusion: { block: targetBlock, maxBlock: targetBlock + env.blockRangeSize },
+    inclusion: { block: targetBlock, maxBlock: targetBlock },
     body: [{ tx: signedUnlockTx, canRevert: false }],
     validity: {
       refundConfig: [

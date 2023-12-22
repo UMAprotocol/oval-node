@@ -19,7 +19,6 @@ export const env = {
   ovalAddress: getAddress(getEnvVar("OVAL_ADDRESS", fallback.ovalAddress)),
   honeyPot: getAddress(getEnvVar("HONEYPOT_ADDRESS", fallback.honeyPot)),
   refundAddress: getAddress(getEnvVar("REFUND_ADDRESS", fallback.refundAddress)),
-  blockRangeSize: getInt(getEnvVar("BLOCK_RANGE_SIZE", fallback.blockRangeSize)),
   refundPercent: getFloat(getEnvVar("REFUND_PERCENT", fallback.refundPercent)),
   builders: getStringArray(getEnvVar("BUILDERS", JSON.stringify(fallback.builders))),
 };
