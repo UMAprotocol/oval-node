@@ -32,6 +32,5 @@ export const env = {
   providerUrl: getEnvVar("PROVIDER_URL"),
   ovalConfigs: getOvalConfigs(getEnvVar("OVAL_CONFIGS", stringifiedFallbackOvalConfigs)),
   forwardUrl: getEnvVar("FORWARD_URL", fallback.forwardUrl),
-  blockRangeSize: getInt(getEnvVar("BLOCK_RANGE_SIZE", fallback.blockRangeSize)),
   builders: getStringArray(getEnvVar("BUILDERS", JSON.stringify(fallback.builders))),
 };
