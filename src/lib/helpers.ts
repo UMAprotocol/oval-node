@@ -1,18 +1,29 @@
-import { JsonRpcProvider, WebSocketProvider, Network, Wallet, Provider, isHexString, Transaction } from "ethers";
+import { JsonRpcProvider, Network, Wallet, Provider, isAddress, isHexString, Transaction } from "ethers";
 import MevShareClient from "@flashbots/mev-share-client";
 import { FlashbotsBundleProvider } from "flashbots-ethers-v6-provider-bundle";
 import { env } from "./env";
 import { Logger } from "./logging";
+import { OvalConfig, OvalConfigs } from "./types";
 
 export function getProvider() {
   return new JsonRpcProvider(env.providerUrl, new Network("mainnet", 1));
 }
 
-export async function initWallet(provider: JsonRpcProvider | WebSocketProvider) {
+// Initialize unlocker wallets for each Oval instance.
+export function initWallets(provider: JsonRpcProvider) {
+  return Object.entries(env.ovalConfigs).reduce(
+    (wallets, [address, config]) => {
+      wallets[address] = new Wallet(config.unlockerKey).connect(provider);
+      return wallets;
+    },
+    {} as Record<string, Wallet>,
+  );
+}
+
+export async function initClients(provider: JsonRpcProvider) {
   const authSigner = new Wallet(env.authKey).connect(provider);
 
   return {
-    wallet: new Wallet(env.senderKey).connect(provider),
     mevshare: MevShareClient.useEthereumMainnet(authSigner),
     flashbotsBundleProvider: await FlashbotsBundleProvider.create(provider, authSigner),
   };
@@ -92,7 +103,7 @@ export function isEthSendBundleParams(params: unknown): params is [{ txs: string
     Array.isArray(params[0].txs) &&
     params[0].txs.every((tx: unknown) => isValidTx(tx)) &&
     isHexString(params[0].blockNumber) &&
-    Object.keys(params[0]).every(key => ["txs", "blockNumber"].includes(key)) // Nothing else supported.
+    Object.keys(params[0]).every((key) => ["txs", "blockNumber"].includes(key)) // Nothing else supported.
   );
 }
 
@@ -110,7 +121,7 @@ export function isEthCallBundleParams(
     params[0].txs.every((tx: unknown) => isValidTx(tx)) &&
     isHexString(params[0].blockNumber) &&
     params[0].stateBlockNumber === "latest" && // We only support latest as otherwise unlock nonce could be too high.
-    Object.keys(params[0]).every(key => ["txs", "blockNumber", "stateBlockNumber"].includes(key)) // Nothing else supported.
+    Object.keys(params[0]).every((key) => ["txs", "blockNumber", "stateBlockNumber"].includes(key)) // Nothing else supported.
   );
 }
 
@@ -130,4 +141,52 @@ export function stringifyBigInts(obj: any): any {
     }
   }
   return obj;
+}
+
+// Type guard for OvalConfig.
+function isOvalConfig(input: unknown): input is OvalConfig {
+  return (
+    typeof input === "object" &&
+    input !== null &&
+    !Array.isArray(input) &&
+    "unlockerKey" in input &&
+    typeof input["unlockerKey"] === "string" &&
+    isHexString(input["unlockerKey"], 32) &&
+    "refundAddress" in input &&
+    isAddress(input["refundAddress"]) &&
+    typeof input["refundAddress"] === "string" &&
+    "refundPercent" in input &&
+    typeof input["refundPercent"] === "number" &&
+    input["refundPercent"] >= 0 &&
+    input["refundPercent"] <= 100
+  );
+}
+
+// Type guard for OvalConfigs. All records must have unique Oval addresses and unlockerKeys.
+function isOvalConfigs(input: unknown): input is OvalConfigs {
+  return (
+    typeof input === "object" &&
+    input !== null &&
+    !Array.isArray(input) &&
+    Object.keys(input).length === new Set(Object.keys(input)).size &&
+    Object.keys(input).every((key) => isAddress(key)) &&
+    Object.values(input).every((value) => isOvalConfig(value)) &&
+    Object.values(input).length === new Set(Object.values(input).map((value) => value.unlockerKey)).size
+  );
+}
+
+export function getOvalConfigs(input: string): OvalConfigs {
+  let parsedInput: unknown;
+
+  try {
+    parsedInput = JSON.parse(input);
+  } catch (error) {
+    throw new Error(`Value "${input}" cannot be converted to OvalConfigs records`);
+  }
+
+  if (isOvalConfigs(parsedInput)) {
+    return parsedInput;
+  }
+
+  throw new Error(`Value "${input}" is valid JSON but is not OvalConfigs records`);
 }

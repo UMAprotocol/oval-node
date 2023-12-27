@@ -1,8 +1,9 @@
+import axios from "axios";
 import { Request, Response, NextFunction } from "express";
 import { keccak256, concat } from "ethers";
 import { SimulationResponse, SimulationResponseSuccess } from "flashbots-ethers-v6-provider-bundle";
 import { createJSONRPCErrorResponse, createJSONRPCSuccessResponse, JSONRPCErrorException } from "json-rpc-2.0";
-import { Logger, stringifyBigInts } from "../lib";
+import { env, Logger, stringifyBigInts } from "../lib";
 
 // Error handler that logs error and sends JSON-RPC error response.
 export function expressErrorHandler(err: Error, req: Request, res: Response, next: NextFunction) {
@@ -14,15 +15,6 @@ export function expressErrorHandler(err: Error, req: Request, res: Response, nex
     res
       .status(200)
       .send(createJSONRPCErrorResponse(req.body.id, -32603, "Internal error", `${err.name}: ${err.message}`));
-  }
-}
-
-// Bundle simulation handler that just logs errors for debugging.
-export function logSimulationErrors(simulationResponse: SimulationResponse) {
-  if ("error" in simulationResponse) {
-    Logger.debug("Simulation error", { simulationResponse });
-  } else if (simulationResponse.firstRevert && "error" in simulationResponse.firstRevert) {
-    Logger.debug("Simulation reverted", stringifyBigInts({ simulationResponse }));
   }
 }
 
@@ -72,4 +64,33 @@ export function handleBundleSimulation(
     const clientSimulationResult = removeUnlockFromSimulationResult(simulationResponse, unlockTxHash);
     res.status(200).send(createJSONRPCSuccessResponse(req.body.id, stringifyBigInts(clientSimulationResult)));
   }
+}
+
+// Handler that passes unsupported requests to the forwardUrl.
+export async function handleUnsupportedRequest(req: Request, res: Response) {
+  const { method, body } = req;
+
+  Logger.debug(`Received unsupported request! Forwarding to ${env.forwardUrl} ...`, { body });
+  const response = await axios({
+    method: method as any,
+    url: `${env.forwardUrl}`,
+    headers: { ...req.headers, host: new URL(env.forwardUrl).hostname },
+    data: body,
+  });
+
+  const { status, data } = response;
+
+  res.status(status).send(data);
+}
+
+// Helper to check if the original bundle reverts without the unlock and logs for debugging.
+export function originalBundleReverts(simulationResponse: SimulationResponse) {
+  if ("error" in simulationResponse) {
+    Logger.debug("Original bundle simulation error", { simulationResponse });
+    return false;
+  } else if (!simulationResponse.firstRevert || !("error" in simulationResponse.firstRevert)) {
+    Logger.debug("Original bundle simulation succeeds without unlock", stringifyBigInts({ simulationResponse }));
+    return false;
+  }
+  return true;
 }

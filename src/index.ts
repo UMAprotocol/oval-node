@@ -1,39 +1,43 @@
 import express from "express";
 import bodyParser from "body-parser";
-import axios from "axios";
-import https from "https";
 import dotenv from "dotenv";
 import morgan from "morgan";
 
 dotenv.config();
 
-import { keccak256, Wallet, TransactionRequest, Contract, Transaction } from "ethers";
+import { keccak256, Wallet, TransactionRequest, Interface, Transaction } from "ethers";
+import { FlashbotsBundleProvider } from "flashbots-ethers-v6-provider-bundle";
 import { createJSONRPCErrorResponse, createJSONRPCSuccessResponse, isJSONRPCRequest, isJSONRPCID } from "json-rpc-2.0";
 import { BundleParams } from "@flashbots/mev-share-client";
 import MevShareClient from "@flashbots/mev-share-client";
 
 import {
-  initWallet,
   getProvider,
   env,
   getBaseFee,
+  initClients,
+  initWallets,
   isEthCallBundleParams,
   isEthSendBundleParams,
   ExtendedBundleParams,
   Logger,
 } from "./lib";
 import { ovalAbi } from "./abi";
-import { expressErrorHandler, handleBundleSimulation, logSimulationErrors } from "./handlers";
-
-const agent = new https.Agent({ rejectUnauthorized: false }); // this might not be needed (and might add security risks in prod).
+import {
+  expressErrorHandler,
+  handleBundleSimulation,
+  handleUnsupportedRequest,
+  originalBundleReverts,
+} from "./handlers";
 
 const app = express();
 app.use(bodyParser.json());
 app.use(morgan("tiny"));
 
 const provider = getProvider();
-const { ovalAddress, refundAddress } = env;
-const oval = new Contract(ovalAddress, ovalAbi);
+const unlockerWallets = initWallets(provider);
+const { ovalConfigs } = env;
+const ovalInterface = Interface.from(ovalAbi);
 
 // Start restful API server to listen for root inbound post requests.
 app.post("/", async (req, res, next) => {
@@ -49,25 +53,44 @@ app.post("/", async (req, res, next) => {
         return;
       }
 
-      Logger.debug("Received eth_sendBundle request! Sending unlock tx bundle and backrun bundle...", { body });
+      Logger.debug("Received eth_sendBundle request!", { body });
 
+      const backrunTxs = body.params[0].txs;
       const targetBlock = parseInt(Number(body.params[0].blockNumber).toString());
 
-      const { wallet, mevshare, flashbotsBundleProvider } = await initWallet(provider);
+      const { mevshare, flashbotsBundleProvider } = await initClients(provider);
+
+      // Simulate the original bundle to check if it reverts without the unlock.
+      const originalSimulationResponse = await flashbotsBundleProvider.simulate(backrunTxs, targetBlock);
+      if (!originalBundleReverts(originalSimulationResponse)) {
+        await handleUnsupportedRequest(req, res); // Pass through if the original bundle doesn't revert.
+        return;
+      }
+
+      Logger.debug("Finding unlock that does not revert the bundle...");
+
+      const unlock = await findUnlock(flashbotsBundleProvider, backrunTxs, targetBlock);
+      if (!unlock) {
+        Logger.debug("No valid unlock found!");
+        await handleUnsupportedRequest(req, res); // Pass through if no unlock is found.
+        return;
+      }
+
+      Logger.debug(`Found valid unlock at ${unlock.ovalAddress}. Sending unlock tx bundle and backrun bundle...`);
 
       // Send the call to Oval to unlock the latest value.
-      const { unlockBundleHash, signedUnlockTx } = await sendUnlockLatestValue(
-        wallet,
+      await sendUnlockLatestValue(
+        unlock.signedUnlockTx,
+        ovalConfigs[unlock.ovalAddress].refundAddress,
+        ovalConfigs[unlock.ovalAddress].refundPercent,
         mevshare,
-        oval,
         targetBlock,
-        refundAddress,
       );
 
       // Construct the bundle with the modified payload to backrun the UnlockLatestValue call.
       const bundle: BundleParams["body"] = [
-        { hash: unlockBundleHash },
-        ...body.params[0].txs.map((tx): { tx: string; canRevert: boolean } => {
+        { hash: unlock.unlockBundleHash },
+        ...backrunTxs.map((tx): { tx: string; canRevert: boolean } => {
           return { tx, canRevert: false };
         }),
       ];
@@ -83,14 +106,6 @@ app.post("/", async (req, res, next) => {
         },
       };
 
-      // We only log simulation errors for debugging, but proceed with bundle submission as the client is expected to
-      // have simulated the bundle before broadcasting it.
-      const simulationResponse = await flashbotsBundleProvider.simulate(
-        [signedUnlockTx, ...body.params[0].txs],
-        targetBlock,
-      );
-      logSimulationErrors(simulationResponse);
-
       const backrunResult = await mevshare.sendBundle(bundleParams);
 
       Logger.debug("Forwarded a bundle to MEV-Share", { bundleParams });
@@ -104,35 +119,39 @@ app.post("/", async (req, res, next) => {
         return;
       }
 
-      Logger.debug("Received eth_callBundle request! Simulating unlock tx and backrun bundle...", { body });
+      Logger.debug("Received eth_callBundle request!", { body });
 
-      const { wallet, flashbotsBundleProvider } = await initWallet(provider);
+      const backrunTxs = body.params[0].txs;
+      const targetBlock = parseInt(Number(body.params[0].blockNumber).toString());
 
-      // Sign the call to Oval to unlock the latest value.
-      const { unlockTxHash, signedUnlockTx } = await createUnlockLatestValueTx(wallet, oval);
+      const { flashbotsBundleProvider } = await initClients(provider);
+
+      // Simulate the original bundle to check if it reverts without the unlock.
+      const originalSimulationResponse = await flashbotsBundleProvider.simulate(backrunTxs, targetBlock);
+      if (!originalBundleReverts(originalSimulationResponse)) {
+        await handleUnsupportedRequest(req, res); // Pass through if the original bundle doesn't revert.
+        return;
+      }
+
+      Logger.debug("Finding unlock that does not revert the bundle...");
+
+      const unlock = await findUnlock(flashbotsBundleProvider, backrunTxs, targetBlock);
+      if (!unlock) {
+        Logger.debug("No valid unlock found!");
+        await handleUnsupportedRequest(req, res); // Pass through if no unlock is found.
+        return;
+      }
+
+      Logger.debug(`Found valid unlock at ${unlock.ovalAddress}. Simulating unlock tx bundle and backrun bundle...`);
 
       const simulationResponse = await flashbotsBundleProvider.simulate(
-        [signedUnlockTx, ...body.params[0].txs],
-        body.params[0].blockNumber,
+        [unlock.signedUnlockTx, ...backrunTxs],
+        targetBlock,
       );
 
       // Send back the simulation response without the unlock transaction.
-      handleBundleSimulation(simulationResponse, unlockTxHash, req, res);
-      return; // Exit the function here to prevent the request from being forwarded to the FORWARD_URL.
-    }
-    // Else, if we did not receive a valid eth_sendBundle or eth_callBundle, forward the request to the FORWARD_URL.
-    Logger.debug(`Received unsupported request! Forwarding to ${env.forwardUrl} ...`, { body });
-    const response = await axios({
-      method: method as any,
-      url: `${env.forwardUrl}`,
-      headers: { ...req.headers, host: new URL(env.forwardUrl).hostname },
-      data: body,
-      httpsAgent: agent,
-    });
-
-    const { status, data } = response;
-
-    res.status(status).send(data);
+      handleBundleSimulation(simulationResponse, unlock.unlockTxHash, req, res);
+    } else await handleUnsupportedRequest(req, res);
   } catch (error) {
     next(error);
   }
@@ -144,21 +163,20 @@ app.listen(3000, () => {
   Logger.info("Server is running on http://localhost:3000");
 });
 
-const createUnlockLatestValueTx = async (wallet: Wallet, oval: Contract) => {
-  // Run concurrently to save a little time.
-  const [nonce, baseFee, data, network, ovalAddress] = await Promise.all([
-    wallet.getNonce(),
-    getBaseFee(provider),
-    oval.interface.encodeFunctionData("unlockLatestValue"),
-    provider.getNetwork(),
-    oval.getAddress(),
-  ]);
+const createUnlockLatestValueTx = async (
+  wallet: Wallet,
+  baseFee: bigint,
+  data: string,
+  chainId: bigint,
+  ovalAddress: string,
+) => {
+  const nonce = await wallet.getNonce();
 
   // Construct transaction to call unlockLatestValue on Oval Oracle from permissioned address.
   const unlockTx: TransactionRequest = {
     type: 2,
-    chainId: network.chainId,
-    to: ovalAddress, // Target is Oval Oracle used in the demo.
+    chainId,
+    to: ovalAddress,
     nonce,
     value: 0,
     gasLimit: 200000,
@@ -176,16 +194,47 @@ const createUnlockLatestValueTx = async (wallet: Wallet, oval: Contract) => {
   return { unlockTxHash, signedUnlockTx };
 };
 
-const sendUnlockLatestValue = async (
-  wallet: Wallet,
-  mevshare: MevShareClient,
-  oval: Contract,
+// Simulate calls to unlockLatestValue on each Oval instance bundled with original backrun transactions. Tries to find
+// the first unlock that doesn't revert the bundle.
+const findUnlock = async (
+  flashbotsBundleProvider: FlashbotsBundleProvider,
+  backrunTxs: string[],
   targetBlock: number,
-  refundAddress: string,
 ) => {
-  const { unlockTxHash, signedUnlockTx } = await createUnlockLatestValueTx(wallet, oval);
+  const [baseFee, network] = await Promise.all([getBaseFee(provider), provider.getNetwork()]);
+  const data = ovalInterface.encodeFunctionData("unlockLatestValue");
 
-  // Send this as a bundle. Define the max share hints and share kickback to HoneyDao (demo contract).
+  const unlocks = await Promise.all(
+    Object.keys(ovalConfigs).map(async (ovalAddress) => {
+      const { unlockTxHash, signedUnlockTx } = await createUnlockLatestValueTx(
+        unlockerWallets[ovalAddress],
+        baseFee,
+        data,
+        network.chainId,
+        ovalAddress,
+      );
+
+      const simulationResponse = await flashbotsBundleProvider.simulate([signedUnlockTx, ...backrunTxs], targetBlock);
+
+      // MEV-Share is now referencing bundle hash as double hash of the transaction.
+      const unlockBundleHash = keccak256(unlockTxHash);
+
+      return { ovalAddress, unlockBundleHash, unlockTxHash, signedUnlockTx, simulationResponse };
+    }),
+  );
+
+  // Find the first unlock that doesn't revert.
+  return unlocks.find((unlock) => !("error" in unlock.simulationResponse) && !unlock.simulationResponse.firstRevert);
+};
+
+const sendUnlockLatestValue = async (
+  signedUnlockTx: string,
+  refundAddress: string,
+  refundPercent: number,
+  mevshare: MevShareClient,
+  targetBlock: number,
+) => {
+  // Send this as a bundle. Define the max share hints and share kickback to configured refund address.
   const bundleParams: ExtendedBundleParams = {
     inclusion: { block: targetBlock, maxBlock: targetBlock },
     body: [{ tx: signedUnlockTx, canRevert: false }],
@@ -206,15 +255,10 @@ const sendUnlockLatestValue = async (
         txHash: true,
       },
       builders: env.builders,
-      wantRefund: env.refundPercent,
+      wantRefund: refundPercent,
     },
   };
 
   Logger.debug("Unlock Latest Call bundle", { bundleParams });
   await mevshare.sendBundle(bundleParams);
-
-  // MEV-Share is now referencing bundle hash as double hash of the transaction.
-  const unlockBundleHash = keccak256(unlockTxHash);
-
-  return { unlockBundleHash, signedUnlockTx };
 };
