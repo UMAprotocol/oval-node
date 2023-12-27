@@ -159,8 +159,8 @@ app.post("/", async (req, res, next) => {
 
 app.use(expressErrorHandler);
 
-app.listen(3000, () => {
-  Logger.info("Server is running on http://localhost:3000");
+app.listen(env.port, () => {
+  Logger.info(`Server is running on port ${env.port}`);
 });
 
 const createUnlockLatestValueTx = async (
