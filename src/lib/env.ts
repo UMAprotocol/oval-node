@@ -28,6 +28,7 @@ try {
 }
 
 export const env = {
+  port: getInt(getEnvVar("PORT", fallback.port.toString())),
   authKey: getEnvVar("AUTH_PRIVATE_KEY"),
   providerUrl: getEnvVar("PROVIDER_URL"),
   ovalConfigs: getOvalConfigs(getEnvVar("OVAL_CONFIGS", stringifiedFallbackOvalConfigs)),
