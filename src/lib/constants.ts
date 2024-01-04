@@ -16,4 +16,5 @@ export const fallback = {
     "Gambit Labs",
     "payload",
   ],
+  minNetBuilderPayment: "0.0002",
 } as const;

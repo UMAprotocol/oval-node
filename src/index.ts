@@ -5,7 +5,7 @@ import morgan from "morgan";
 
 dotenv.config();
 
-import { keccak256, Wallet, TransactionRequest, Interface, Transaction } from "ethers";
+import { keccak256, Wallet, TransactionRequest, Interface, parseEther, Transaction } from "ethers";
 import { FlashbotsBundleProvider } from "flashbots-ethers-v6-provider-bundle";
 import { createJSONRPCErrorResponse, createJSONRPCSuccessResponse, isJSONRPCRequest, isJSONRPCID } from "json-rpc-2.0";
 import { BundleParams } from "@flashbots/mev-share-client";
@@ -76,13 +76,26 @@ app.post("/", async (req, res, next) => {
         return;
       }
 
+      // Dynamically adjust refund percent so that builder nets at least configured minimum. We don't need to consider
+      // refund gas costs as the builder is deducting them from refund and should not include the bundle if refund gas
+      // costs exceed refund value.
+      const adjustedRefundPercent = adjustRefundPercent(
+        unlock.simulationResponse.coinbaseDiff,
+        ovalConfigs[unlock.ovalAddress].refundPercent,
+      );
+      if (adjustedRefundPercent <= 0) {
+        Logger.debug(`Insufficient builder payment ${unlock.simulationResponse.coinbaseDiff}`);
+        await handleUnsupportedRequest(req, res); // Pass through as minimum payment not met.
+        return;
+      }
+
       Logger.debug(`Found valid unlock at ${unlock.ovalAddress}. Sending unlock tx bundle and backrun bundle...`);
 
       // Send the call to Oval to unlock the latest value.
       await sendUnlockLatestValue(
         unlock.signedUnlockTx,
         ovalConfigs[unlock.ovalAddress].refundAddress,
-        ovalConfigs[unlock.ovalAddress].refundPercent,
+        adjustedRefundPercent,
         mevshare,
         targetBlock,
       );
@@ -229,7 +242,17 @@ const findUnlock = async (
   );
 
   // Find the first unlock that doesn't revert.
-  return unlocks.find((unlock) => !("error" in unlock.simulationResponse) && !unlock.simulationResponse.firstRevert);
+  for (const unlock of unlocks) {
+    if (!("error" in unlock.simulationResponse) && !unlock.simulationResponse.firstRevert) {
+      return {
+        // Spread in order to preserve inferred SimulationResponseSuccess type.
+        ...unlock,
+        simulationResponse: unlock.simulationResponse,
+      };
+    }
+  }
+
+  return undefined;
 };
 
 const sendUnlockLatestValue = async (
@@ -266,4 +289,17 @@ const sendUnlockLatestValue = async (
 
   Logger.debug("Unlock Latest Call bundle", { bundleParams });
   await mevshare.sendBundle(bundleParams);
+};
+
+// Adjusts refund percent to ensure that net builder captured value reaches the minimum configured amount.
+// This can still return 0 if gross builder payment is not sufficient and caller should handle this.
+const adjustRefundPercent = (grossBuilderPayment: bigint, originalRefundPercent: number) => {
+  // Require positive builder payment that covers at least minNetBuilderPaymentWei.
+  if (grossBuilderPayment <= 0 || grossBuilderPayment < env.minNetBuilderPaymentWei) return 0;
+
+  // No need for scaling as Flashbots accepts only integer refund percent value.
+  const maxRefundPercent = Number((grossBuilderPayment - env.minNetBuilderPaymentWei) * 100n / grossBuilderPayment);
+
+  // Bound adjusted refund percent by maxRefundPercent.
+  return Math.min(originalRefundPercent, maxRefundPercent);
 };

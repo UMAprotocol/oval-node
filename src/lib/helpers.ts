@@ -153,10 +153,11 @@ function isOvalConfig(input: unknown): input is OvalConfig {
     typeof input["unlockerKey"] === "string" &&
     isHexString(input["unlockerKey"], 32) &&
     "refundAddress" in input &&
-    isAddress(input["refundAddress"]) &&
     typeof input["refundAddress"] === "string" &&
+    isAddress(input["refundAddress"]) &&
     "refundPercent" in input &&
     typeof input["refundPercent"] === "number" &&
+    Number.isInteger(input["refundPercent"]) &&
     input["refundPercent"] >= 0 &&
     input["refundPercent"] <= 100
   );
