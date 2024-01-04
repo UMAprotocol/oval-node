@@ -48,11 +48,11 @@ app.post("/", async (req, res, next) => {
 
     // Verify that the signature in the request headers matches the bundle payload.
     const verifiedSignatureSearcherPkey = verifyBundleSignature(body, req.headers["x-flashbots-signature"]);
-    
+
     const isValidJSONRPCRequest = isJSONRPCRequest(body) && isJSONRPCID(body.id) && verifiedSignatureSearcherPkey;
 
     // Prepend the unlock transaction if the request is a valid JSON RPC 2.0 'eth_sendBundle' method with a valid bundle signature.
-    if (isValidJSONRPCRequest && body.method == "eth_sendBundle") {
+    if (body.id && isValidJSONRPCRequest && body.method == "eth_sendBundle") {
       if (!isEthSendBundleParams(body.params)) {
         Logger.info("Received unsupported eth_sendBundle request!", { body });
         res.status(200).send(createJSONRPCErrorResponse(req.body.id, -32000, "Unsupported eth_sendBundle params"));
