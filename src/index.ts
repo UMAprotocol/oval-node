@@ -289,14 +289,11 @@ const sendUnlockLatestValue = async (
 // Adjusts refund percent to ensure that net builder captured value reaches the minimum configured amount.
 // This can still return 0 if gross builder payment is not sufficient and caller should handle this.
 const adjustRefundPercent = (grossBuilderPayment: bigint, originalRefundPercent: number) => {
-  // Require positive builder payment.
-  if (grossBuilderPayment <= 0) return 0;
+  // Require positive builder payment that covers at least minNetBuilderPaymentWei.
+  if (grossBuilderPayment <= 0 || grossBuilderPayment < env.minNetBuilderPaymentWei) return 0;
 
-  // Preserve 3 decimal places from refund percent when scaling for bigint calculation.
-  const maxRefundPercent = Math.max(
-    100 - Number((env.minNetBuilderPaymentWei * 100_000n) / grossBuilderPayment) / 1_000,
-    0, // Floor to 0 in case gross builder payment is not sufficient.
-  );
+  // No need for scaling as Flashbots accepts only integer refund percent value.
+  const maxRefundPercent = Number((grossBuilderPayment - env.minNetBuilderPaymentWei) * 100n / grossBuilderPayment);
 
   // Bound adjusted refund percent by maxRefundPercent.
   return Math.min(originalRefundPercent, maxRefundPercent);
