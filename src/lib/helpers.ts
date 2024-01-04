@@ -151,7 +151,8 @@ function isOvalConfig(input: unknown): input is OvalConfig {
     !Array.isArray(input) &&
     "unlockerKey" in input &&
     typeof input["unlockerKey"] === "string" &&
-    isHexString(input["unlockerKey"], 32) &&
+    ((!input["unlockerKey"].startsWith("0x") && isHexString("0x" + input["unlockerKey"], 32)) ||
+      isHexString(input["unlockerKey"], 32)) &&
     "refundAddress" in input &&
     typeof input["refundAddress"] === "string" &&
     isAddress(input["refundAddress"]) &&
