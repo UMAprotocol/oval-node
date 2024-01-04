@@ -160,7 +160,7 @@ app.post("/", async (req, res, next) => {
 app.use(expressErrorHandler);
 
 app.listen(env.port, () => {
-  Logger.info(`Server is running on port ${env.port}`);
+  Logger.debug(`Server is running on port ${env.port}`);
 });
 
 const createUnlockLatestValueTx = async (
