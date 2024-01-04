@@ -1,4 +1,4 @@
-import { JsonRpcProvider, Network, Wallet, Provider, isAddress, isHexString, Transaction } from "ethers";
+import { JsonRpcProvider, Network, Wallet, Provider, isAddress, isHexString, Transaction, ethers } from "ethers";
 import MevShareClient from "@flashbots/mev-share-client";
 import { FlashbotsBundleProvider } from "flashbots-ethers-v6-provider-bundle";
 import { env } from "./env";
@@ -20,9 +20,18 @@ export function initWallets(provider: JsonRpcProvider) {
   );
 }
 
-export async function initClients(provider: JsonRpcProvider) {
-  const authSigner = new Wallet(env.authKey).connect(provider);
+export async function initClients(provider: JsonRpcProvider, searcherPublicKey: string) {
+  // Derive a private key from the searcher's public key and the unlocker's private key. 
+  // This approach ensures that each searcher maintains an independent reputation within the Flashbots network, 
+  // preventing the unlocker from being impacted by a searcher's actions. 
+  // This is in line with Flashbots' advanced reputation management system.
+  // Refer to Flashbots documentation for more details: https://docs.flashbots.net/flashbots-auction/advanced/reputation
+  const derivedPrivateKey = ethers.hashMessage(searcherPublicKey + env.authKey);
 
+  // Create an Ethereum wallet signer using the derived private key, connected to the provided JSON RPC provider.
+  const authSigner = new Wallet(derivedPrivateKey).connect(provider);
+
+  // Return initialized clients for MevShare and FlashbotsBundle, both authenticated using the derived private key.
   return {
     mevshare: MevShareClient.useEthereumMainnet(authSigner),
     flashbotsBundleProvider: await FlashbotsBundleProvider.create(provider, authSigner),
@@ -189,4 +198,26 @@ export function getOvalConfigs(input: string): OvalConfigs {
   }
 
   throw new Error(`Value "${input}" is valid JSON but is not OvalConfigs records`);
+}
+
+// Verify the bundle signature header and return the searcher public key if valid, otherwise return null.
+export function verifyBundleSignature(body: any, xFlashbotsSignatureHeader?: string | string[] | undefined) {
+
+  if (typeof xFlashbotsSignatureHeader !== 'string') {
+    Logger.debug(`Invalid signature header: ${xFlashbotsSignatureHeader}, expected string`);
+    return null;
+  }
+
+  const bundleSignaturePublicKey = xFlashbotsSignatureHeader.split(':')[0];
+  const bundleSignedMessage = xFlashbotsSignatureHeader.split(':')[1];
+
+  const serializedBody = JSON.stringify(body);
+
+  const hash = ethers.keccak256(ethers.toUtf8Bytes(serializedBody));
+
+  const recoveredAddress = ethers.verifyMessage(hash, bundleSignedMessage);
+
+  const verified = recoveredAddress === bundleSignaturePublicKey;
+
+  return verified ? recoveredAddress : null;
 }

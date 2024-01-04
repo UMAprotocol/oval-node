@@ -5,7 +5,7 @@ import morgan from "morgan";
 
 dotenv.config();
 
-import { keccak256, Wallet, TransactionRequest, Interface, Transaction } from "ethers";
+import { keccak256, Wallet, TransactionRequest, Interface, Transaction, ethers } from "ethers";
 import { FlashbotsBundleProvider } from "flashbots-ethers-v6-provider-bundle";
 import { createJSONRPCErrorResponse, createJSONRPCSuccessResponse, isJSONRPCRequest, isJSONRPCID } from "json-rpc-2.0";
 import { BundleParams } from "@flashbots/mev-share-client";
@@ -21,6 +21,7 @@ import {
   isEthSendBundleParams,
   ExtendedBundleParams,
   Logger,
+  verifyBundleSignature,
 } from "./lib";
 import { ovalAbi } from "./abi";
 import {
@@ -45,9 +46,11 @@ app.post("/", async (req, res, next) => {
     const { url, method, body } = req;
     Logger.debug(`Received: ${method} ${url}`, { body });
 
+    const verifiedSignatureSearcherPkey = verifyBundleSignature(body, req.headers["x-flashbots-signature"]);
+
     // If the request is a valid JSON RPC 2.0 eth_sendBundle method, prepend the unlock transaction.
     if (isJSONRPCRequest(body) && isJSONRPCID(body.id) && body.method == "eth_sendBundle") {
-      if (!isEthSendBundleParams(body.params)) {
+      if (!isEthSendBundleParams(body.params) || !verifiedSignatureSearcherPkey) {
         Logger.info("Received unsupported eth_sendBundle request!", { body });
         res.status(200).send(createJSONRPCErrorResponse(req.body.id, -32000, "Unsupported eth_sendBundle params"));
         return;
@@ -58,7 +61,7 @@ app.post("/", async (req, res, next) => {
       const backrunTxs = body.params[0].txs;
       const targetBlock = parseInt(Number(body.params[0].blockNumber).toString());
 
-      const { mevshare, flashbotsBundleProvider } = await initClients(provider);
+      const { mevshare, flashbotsBundleProvider } = await initClients(provider, verifiedSignatureSearcherPkey);
 
       // Simulate the original bundle to check if it reverts without the unlock.
       const originalSimulationResponse = await flashbotsBundleProvider.simulate(backrunTxs, targetBlock);
@@ -113,7 +116,7 @@ app.post("/", async (req, res, next) => {
       res.status(200).send(createJSONRPCSuccessResponse(body.id, backrunResult));
       return; // Exit the function here to prevent the request from being forwarded to the FORWARD_URL.
     } else if (isJSONRPCRequest(body) && isJSONRPCID(body.id) && body.method == "eth_callBundle") {
-      if (!isEthCallBundleParams(body.params)) {
+      if (!isEthCallBundleParams(body.params) || !verifiedSignatureSearcherPkey) {
         Logger.info("Received unsupported eth_callBundle request!", { body });
         res.status(200).send(createJSONRPCErrorResponse(req.body.id, -32000, "Unsupported eth_callBundle params"));
         return;
@@ -124,7 +127,7 @@ app.post("/", async (req, res, next) => {
       const backrunTxs = body.params[0].txs;
       const targetBlock = parseInt(Number(body.params[0].blockNumber).toString());
 
-      const { flashbotsBundleProvider } = await initClients(provider);
+      const { flashbotsBundleProvider } = await initClients(provider, verifiedSignatureSearcherPkey);
 
       // Simulate the original bundle to check if it reverts without the unlock.
       const originalSimulationResponse = await flashbotsBundleProvider.simulate(backrunTxs, targetBlock);
