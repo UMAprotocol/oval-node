@@ -157,6 +157,11 @@ app.post("/", async (req, res, next) => {
   }
 });
 
+// Health check endpoint.
+app.get("/ready", (req, res) => {
+  res.status(200).send("OK");
+});
+
 app.use(expressErrorHandler);
 
 app.listen(env.port, () => {
