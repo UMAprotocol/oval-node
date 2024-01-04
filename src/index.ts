@@ -46,11 +46,14 @@ app.post("/", async (req, res, next) => {
     const { url, method, body } = req;
     Logger.debug(`Received: ${method} ${url}`, { body });
 
+    // Verify that the signature in the request headers matches the bundle payload.
     const verifiedSignatureSearcherPkey = verifyBundleSignature(body, req.headers["x-flashbots-signature"]);
+    
+    const isValidJSONRPCRequest = isJSONRPCRequest(body) && isJSONRPCID(body.id) && verifiedSignatureSearcherPkey;
 
-    // If the request is a valid JSON RPC 2.0 eth_sendBundle method, prepend the unlock transaction.
-    if (isJSONRPCRequest(body) && isJSONRPCID(body.id) && body.method == "eth_sendBundle") {
-      if (!isEthSendBundleParams(body.params) || !verifiedSignatureSearcherPkey) {
+    // Prepend the unlock transaction if the request is a valid JSON RPC 2.0 'eth_sendBundle' method with a valid bundle signature.
+    if (isValidJSONRPCRequest && body.method == "eth_sendBundle") {
+      if (!isEthSendBundleParams(body.params)) {
         Logger.info("Received unsupported eth_sendBundle request!", { body });
         res.status(200).send(createJSONRPCErrorResponse(req.body.id, -32000, "Unsupported eth_sendBundle params"));
         return;
@@ -115,8 +118,8 @@ app.post("/", async (req, res, next) => {
 
       res.status(200).send(createJSONRPCSuccessResponse(body.id, backrunResult));
       return; // Exit the function here to prevent the request from being forwarded to the FORWARD_URL.
-    } else if (isJSONRPCRequest(body) && isJSONRPCID(body.id) && body.method == "eth_callBundle") {
-      if (!isEthCallBundleParams(body.params) || !verifiedSignatureSearcherPkey) {
+    } else if (isValidJSONRPCRequest && body.method == "eth_callBundle") {
+      if (!isEthCallBundleParams(body.params)) {
         Logger.info("Received unsupported eth_callBundle request!", { body });
         res.status(200).send(createJSONRPCErrorResponse(req.body.id, -32000, "Unsupported eth_callBundle params"));
         return;
