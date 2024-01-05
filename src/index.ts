@@ -46,10 +46,7 @@ app.post("/", async (req, res, next) => {
     const { url, method, body } = req;
     Logger.debug(`Received: ${method} ${url}`, { body });
 
-    // Store the request body id for type checking.
-    const bodyId = body.id;
-
-    if (!isJSONRPCRequest(body) || !isJSONRPCID(bodyId)) {
+    if (!isJSONRPCRequest(body) || !isJSONRPCID(body.id)) {
       await handleUnsupportedRequest(req, res);
       return;
     }
@@ -61,7 +58,7 @@ app.post("/", async (req, res, next) => {
     if (verifiedSignatureSearcherPkey && body.method == "eth_sendBundle") {
       if (!isEthSendBundleParams(body.params)) {
         Logger.info("Received unsupported eth_sendBundle request!", { body });
-        res.status(200).send(createJSONRPCErrorResponse(bodyId, -32000, "Unsupported eth_sendBundle params"));
+        res.status(200).send(createJSONRPCErrorResponse(body.id, -32000, "Unsupported eth_sendBundle params"));
         return;
       }
 
@@ -135,12 +132,12 @@ app.post("/", async (req, res, next) => {
 
       Logger.debug("Forwarded a bundle to MEV-Share", { bundleParams });
 
-      res.status(200).send(createJSONRPCSuccessResponse(bodyId, backrunResult));
+      res.status(200).send(createJSONRPCSuccessResponse(body.id, backrunResult));
       return; // Exit the function here to prevent the request from being forwarded to the FORWARD_URL.
     } else if (verifiedSignatureSearcherPkey && body.method == "eth_callBundle") {
       if (!isEthCallBundleParams(body.params)) {
         Logger.info("Received unsupported eth_callBundle request!", { body });
-        res.status(200).send(createJSONRPCErrorResponse(bodyId, -32000, "Unsupported eth_callBundle params"));
+        res.status(200).send(createJSONRPCErrorResponse(body.id, -32000, "Unsupported eth_callBundle params"));
         return;
       }
 

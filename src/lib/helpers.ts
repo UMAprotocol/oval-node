@@ -217,7 +217,7 @@ export function verifyBundleSignature(body: JSONRPCRequest, xFlashbotsSignatureH
 
   const serializedBody = JSON.stringify(body);
 
-  const hash = ethers.keccak256(ethers.toUtf8Bytes(serializedBody));
+  const hash = ethers.id(serializedBody);
 
   const recoveredAddress = ethers.verifyMessage(hash, bundleSignedMessage);
 
