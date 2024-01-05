@@ -4,6 +4,7 @@ import { FlashbotsBundleProvider } from "flashbots-ethers-v6-provider-bundle";
 import { env } from "./env";
 import { Logger } from "./logging";
 import { OvalConfig, OvalConfigs } from "./types";
+import { JSONRPCRequest } from "json-rpc-2.0";
 
 export function getProvider() {
   return new JsonRpcProvider(env.providerUrl, new Network("mainnet", 1));
@@ -26,7 +27,7 @@ export async function initClients(provider: JsonRpcProvider, searcherPublicKey: 
   // preventing the unlocker from being impacted by a searcher's actions. 
   // This is in line with Flashbots' advanced reputation management system.
   // Refer to Flashbots documentation for more details: https://docs.flashbots.net/flashbots-auction/advanced/reputation
-  const derivedPrivateKey = ethers.hashMessage(searcherPublicKey + env.authKey);
+  const derivedPrivateKey = ethers.solidityPackedKeccak256(["address", "bytes32"], [searcherPublicKey, env.authKey]);
 
   // Create an Ethereum wallet signer using the derived private key, connected to the provided JSON RPC provider.
   const authSigner = new Wallet(derivedPrivateKey).connect(provider);
@@ -202,7 +203,7 @@ export function getOvalConfigs(input: string): OvalConfigs {
 
 // Verify the bundle signature header and return the address of the private key that produced the searchers signature if
 // valid, otherwise return null.
-export function verifyBundleSignature(body: any, xFlashbotsSignatureHeader?: string | string[] | undefined) {
+export function verifyBundleSignature(body: JSONRPCRequest, xFlashbotsSignatureHeader: string | string[] | undefined) {
 
   if (typeof xFlashbotsSignatureHeader !== 'string') {
     Logger.debug(`Invalid signature header: ${xFlashbotsSignatureHeader}, expected string`);

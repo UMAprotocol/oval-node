@@ -46,16 +46,22 @@ app.post("/", async (req, res, next) => {
     const { url, method, body } = req;
     Logger.debug(`Received: ${method} ${url}`, { body });
 
+    // Store the request body id for type checking.
+    const bodyId = body.id;
+
+    if (!isJSONRPCRequest(body) || !isJSONRPCID(bodyId)) {
+      await handleUnsupportedRequest(req, res);
+      return;
+    }
+
     // Verify that the signature in the request headers matches the bundle payload.
     const verifiedSignatureSearcherPkey = verifyBundleSignature(body, req.headers["x-flashbots-signature"]);
 
-    const isValidJSONRPCRequest = isJSONRPCRequest(body) && isJSONRPCID(body.id) && verifiedSignatureSearcherPkey;
-
     // Prepend the unlock transaction if the request is a valid JSON RPC 2.0 'eth_sendBundle' method with a valid bundle signature.
-    if (body.id && isValidJSONRPCRequest && body.method == "eth_sendBundle") {
+    if (verifiedSignatureSearcherPkey && body.method == "eth_sendBundle") {
       if (!isEthSendBundleParams(body.params)) {
         Logger.info("Received unsupported eth_sendBundle request!", { body });
-        res.status(200).send(createJSONRPCErrorResponse(req.body.id, -32000, "Unsupported eth_sendBundle params"));
+        res.status(200).send(createJSONRPCErrorResponse(bodyId, -32000, "Unsupported eth_sendBundle params"));
         return;
       }
 
@@ -116,12 +122,12 @@ app.post("/", async (req, res, next) => {
 
       Logger.debug("Forwarded a bundle to MEV-Share", { bundleParams });
 
-      res.status(200).send(createJSONRPCSuccessResponse(body.id, backrunResult));
+      res.status(200).send(createJSONRPCSuccessResponse(bodyId, backrunResult));
       return; // Exit the function here to prevent the request from being forwarded to the FORWARD_URL.
-    } else if (isValidJSONRPCRequest && body.method == "eth_callBundle") {
+    } else if (verifiedSignatureSearcherPkey && body.method == "eth_callBundle") {
       if (!isEthCallBundleParams(body.params)) {
         Logger.info("Received unsupported eth_callBundle request!", { body });
-        res.status(200).send(createJSONRPCErrorResponse(req.body.id, -32000, "Unsupported eth_callBundle params"));
+        res.status(200).send(createJSONRPCErrorResponse(bodyId, -32000, "Unsupported eth_callBundle params"));
         return;
       }
 
