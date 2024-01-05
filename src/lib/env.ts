@@ -1,4 +1,4 @@
-import { getAddress } from "ethers";
+import { getAddress, parseEther } from "ethers";
 import dotenv from "dotenv";
 import { fallback } from "./constants";
 import { getInt, getFloat, getStringArray, getOvalConfigs } from "./helpers";
@@ -34,4 +34,5 @@ export const env = {
   ovalConfigs: getOvalConfigs(getEnvVar("OVAL_CONFIGS", stringifiedFallbackOvalConfigs)),
   forwardUrl: getEnvVar("FORWARD_URL", fallback.forwardUrl),
   builders: getStringArray(getEnvVar("BUILDERS", JSON.stringify(fallback.builders))),
+  minNetBuilderPaymentWei: parseEther(getEnvVar("MIN_NET_BUILDER_PAYMENT", fallback.minNetBuilderPayment)),
 };
