@@ -200,7 +200,8 @@ export function getOvalConfigs(input: string): OvalConfigs {
   throw new Error(`Value "${input}" is valid JSON but is not OvalConfigs records`);
 }
 
-// Verify the bundle signature header and return the searcher public key if valid, otherwise return null.
+// Verify the bundle signature header and return the address of the private key that produced the searchers signature if
+// valid, otherwise return null.
 export function verifyBundleSignature(body: any, xFlashbotsSignatureHeader?: string | string[] | undefined) {
 
   if (typeof xFlashbotsSignatureHeader !== 'string') {
