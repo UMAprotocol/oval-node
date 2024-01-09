@@ -5,11 +5,10 @@ import morgan from "morgan";
 
 dotenv.config();
 
-import { keccak256, Wallet, TransactionRequest, Interface, Transaction } from "ethers";
+import { Wallet, TransactionRequest, Interface, Transaction } from "ethers";
 import { FlashbotsBundleProvider } from "flashbots-ethers-v6-provider-bundle";
 import { createJSONRPCErrorResponse, createJSONRPCSuccessResponse, isJSONRPCRequest, isJSONRPCID } from "json-rpc-2.0";
 import { BundleParams } from "@flashbots/mev-share-client";
-import MevShareClient from "@flashbots/mev-share-client";
 
 import {
   getProvider,
@@ -100,18 +99,16 @@ app.post("/", async (req, res, next) => {
 
       Logger.debug(`Found valid unlock at ${unlock.ovalAddress}. Sending unlock tx bundle and backrun bundle...`);
 
-      // Send the call to Oval to unlock the latest value.
-      await sendUnlockLatestValue(
+      // Construct the inner bundle with call to Oval to unlock the latest value.
+      const unlockBundle = createUnlockLatestValueBundle(
         unlock.signedUnlockTx,
         ovalConfigs[unlock.ovalAddress].refundAddress,
-        adjustedRefundPercent,
-        mevshare,
         targetBlock,
       );
 
-      // Construct the bundle with the modified payload to backrun the UnlockLatestValue call.
+      // Construct the outer bundle with the modified payload to backrun the UnlockLatestValue call.
       const bundle: BundleParams["body"] = [
-        { hash: unlock.unlockBundleHash },
+        { bundle: unlockBundle },
         ...backrunTxs.map((tx): { tx: string; canRevert: boolean } => {
           return { tx, canRevert: false };
         }),
@@ -125,6 +122,9 @@ app.post("/", async (req, res, next) => {
         body: bundle,
         privacy: {
           builders: env.builders,
+        },
+        validity: {
+          refund: [{ bodyIdx: 0, percent: adjustedRefundPercent }],
         },
       };
 
@@ -243,10 +243,7 @@ const findUnlock = async (
 
       const simulationResponse = await flashbotsBundleProvider.simulate([signedUnlockTx, ...backrunTxs], targetBlock);
 
-      // MEV-Share is now referencing bundle hash as double hash of the transaction.
-      const unlockBundleHash = keccak256(unlockTxHash);
-
-      return { ovalAddress, unlockBundleHash, unlockTxHash, signedUnlockTx, simulationResponse };
+      return { ovalAddress, unlockTxHash, signedUnlockTx, simulationResponse };
     }),
   );
 
@@ -264,14 +261,8 @@ const findUnlock = async (
   return undefined;
 };
 
-const sendUnlockLatestValue = async (
-  signedUnlockTx: string,
-  refundAddress: string,
-  refundPercent: number,
-  mevshare: MevShareClient,
-  targetBlock: number,
-) => {
-  // Send this as a bundle. Define the max share hints and share kickback to configured refund address.
+const createUnlockLatestValueBundle = (signedUnlockTx: string, refundAddress: string, targetBlock: number) => {
+  // Create this as a bundle. Define the max share hints and share kickback to configured refund address.
   const bundleParams: ExtendedBundleParams = {
     inclusion: { block: targetBlock, maxBlock: targetBlock },
     body: [{ tx: signedUnlockTx, canRevert: false }],
@@ -292,12 +283,10 @@ const sendUnlockLatestValue = async (
         txHash: true,
       },
       builders: env.builders,
-      wantRefund: refundPercent,
     },
   };
 
-  Logger.debug("Unlock Latest Call bundle", { bundleParams });
-  await mevshare.sendBundle(bundleParams);
+  return bundleParams;
 };
 
 // Adjusts refund percent to ensure that net builder captured value reaches the minimum configured amount.
