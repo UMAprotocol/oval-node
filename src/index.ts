@@ -298,7 +298,7 @@ const adjustRefundPercent = (grossBuilderPayment: bigint, originalRefundPercent:
   if (grossBuilderPayment <= 0 || grossBuilderPayment < env.minNetBuilderPaymentWei) return 0;
 
   // No need for scaling as Flashbots accepts only integer refund percent value.
-  const maxRefundPercent = Number((grossBuilderPayment - env.minNetBuilderPaymentWei) * 100n / grossBuilderPayment);
+  const maxRefundPercent = Number(((grossBuilderPayment - env.minNetBuilderPaymentWei) * 100n) / grossBuilderPayment);
 
   // Bound adjusted refund percent by maxRefundPercent.
   return Math.min(originalRefundPercent, maxRefundPercent);
