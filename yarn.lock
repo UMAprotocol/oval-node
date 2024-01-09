@@ -322,15 +322,6 @@
   resolved "https://registry.yarnpkg.com/@fastify/busboy/-/busboy-2.1.0.tgz#0709e9f4cb252351c609c6e6d8d6779a8d25edff"
   integrity sha512-+KpH+QxZU7O4675t3mnkQKcZZg56u+K/Ct2K+N2AZYNVK8kyeo/bI18tI8aPm3tvNNRyTWfj6s5tnGNlcbQRsA==
 
-"@flashbots/mev-share-client@^0.7.10":
-  version "0.7.10"
-  resolved "https://registry.yarnpkg.com/@flashbots/mev-share-client/-/mev-share-client-0.7.10.tgz#f86383dd91bf3bb6d6451456ce418229814009eb"
-  integrity sha512-jK2ZejfPzNY4du4pKnu9PTxMikbgHOKhfpXgAe6g/QeDyzz1yzfGLIffxa6CaqM0ygyyUMIPs3h2pgL3MzA4tg==
-  dependencies:
-    async-mutex "^0.4.0"
-    axios "^1.3.4"
-    eventsource "^2.0.2"
-
 "@gar/promisify@^1.0.1":
   version "1.1.3"
   resolved "https://registry.yarnpkg.com/@gar/promisify/-/promisify-1.1.3.tgz#555193ab2e3bb3b6adc3d551c9c030d9e860daf6"
@@ -751,6 +742,15 @@
   version "1.1.0"
   resolved "https://registry.yarnpkg.com/@protobufjs/utf8/-/utf8-1.1.0.tgz#a777360b5b39a1a2e5106f8e858f2fd2d060c570"
   integrity sha512-Vvn3zZrhQZkkBE8LSuW3em98c0FwgO4nxzv6OdSxPKJIEKY2bGbHn+mhGIPerzI4twdxaP8/0+06HBpwf345Lw==
+
+"@reinis_frp/mev-share-client@^0.7.10":
+  version "0.7.10"
+  resolved "https://registry.yarnpkg.com/@reinis_frp/mev-share-client/-/mev-share-client-0.7.10.tgz#e5627199b538e084e1eb720f53ceaa491fa47924"
+  integrity sha512-aOVfk8nJudMCwWVd+VZS1qpC86tmRk+PlBNXDvX30iD96AB0GylwnDYos51oN480YZOCQSF2H18rMtOFwtSJ9w==
+  dependencies:
+    async-mutex "^0.4.0"
+    axios "^1.3.4"
+    eventsource "^2.0.2"
 
 "@sapphire/async-queue@^1.5.0":
   version "1.5.0"
