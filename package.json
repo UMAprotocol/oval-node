@@ -32,6 +32,7 @@
   "scripts": {
     "dev": "nodemon",
     "build": "tsc",
-    "start": "node ./out/index.js"
+    "start": "node ./out/index.js",
+    "lint": "prettier './**/*.ts' --write"
   }
 }

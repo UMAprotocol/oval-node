@@ -20,7 +20,7 @@ try {
       unlockerKey: getEnvVar("SENDER_PRIVATE_KEY"),
       refundAddress: getEnvVar("REFUND_ADDRESS", fallback.refundAddress),
       refundPercent: getFloat(getEnvVar("REFUND_PERCENT", fallback.refundPercent)),
-    }
+    },
   };
   stringifiedFallbackOvalConfigs = JSON.stringify(fallbackOvalConfigs);
 } catch {
