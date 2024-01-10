@@ -1,7 +1,7 @@
 import { getAddress, parseEther } from "ethers";
 import dotenv from "dotenv";
 import { fallback } from "./constants";
-import { getInt, getFloat, getStringArray, getOvalConfigs } from "./helpers";
+import { getInt, getFloat, getStringArray, getOvalConfigs, getPrivateKey } from "./helpers";
 import { OvalConfigs } from "./types";
 dotenv.config({ path: ".env" });
 
@@ -17,7 +17,7 @@ let stringifiedFallbackOvalConfigs: string | undefined;
 try {
   const fallbackOvalConfigs: OvalConfigs = {
     [getAddress(getEnvVar("OVAL_ADDRESS", fallback.ovalAddress))]: {
-      unlockerKey: getEnvVar("SENDER_PRIVATE_KEY"),
+      unlockerKey: getPrivateKey(getEnvVar("SENDER_PRIVATE_KEY")),
       refundAddress: getEnvVar("REFUND_ADDRESS", fallback.refundAddress),
       refundPercent: getFloat(getEnvVar("REFUND_PERCENT", fallback.refundPercent)),
     },
@@ -29,7 +29,7 @@ try {
 
 export const env = {
   port: getInt(getEnvVar("PORT", fallback.port.toString())),
-  authKey: getEnvVar("AUTH_PRIVATE_KEY"),
+  authKey: getPrivateKey(getEnvVar("AUTH_PRIVATE_KEY")),
   providerUrl: getEnvVar("PROVIDER_URL"),
   ovalConfigs: getOvalConfigs(getEnvVar("OVAL_CONFIGS", stringifiedFallbackOvalConfigs)),
   forwardUrl: getEnvVar("FORWARD_URL", fallback.forwardUrl),
