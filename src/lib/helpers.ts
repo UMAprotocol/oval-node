@@ -225,3 +225,11 @@ export function verifyBundleSignature(body: JSONRPCRequest, xFlashbotsSignatureH
 
   return verified ? recoveredAddress : null;
 }
+
+// Validate private key and prepend 0x prefix if missing.
+export function getPrivateKey(input: string): string {
+  // Prepend 0x if missing.
+  const privateKey = input.startsWith("0x") ? input : "0x" + input;
+  if (!isHexString(privateKey, 32)) throw new Error(`Value ${input} not a valid private key`);
+  return privateKey;
+}
