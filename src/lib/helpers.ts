@@ -1,5 +1,5 @@
 import { JsonRpcProvider, Network, Wallet, Provider, isAddress, isHexString, Transaction, ethers } from "ethers";
-import MevShareClient from "@flashbots/mev-share-client";
+import MevShareClient from "@reinis_frp/mev-share-client";
 import { FlashbotsBundleProvider } from "flashbots-ethers-v6-provider-bundle";
 import { env } from "./env";
 import { Logger } from "./logging";

@@ -1,4 +1,4 @@
-import { BundleParams, HintPreferences } from "@flashbots/mev-share-client";
+import { BundleParams, HintPreferences } from "@reinis_frp/mev-share-client";
 
 // Extend BundleParams to include undocumented wantRefund required for precise kickback to work.
 export interface ExtendedBundleParams extends BundleParams {
