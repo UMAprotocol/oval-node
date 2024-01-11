@@ -8,7 +8,7 @@ dotenv.config();
 import { Wallet, TransactionRequest, Interface, Transaction } from "ethers";
 import { FlashbotsBundleProvider } from "flashbots-ethers-v6-provider-bundle";
 import { createJSONRPCErrorResponse, createJSONRPCSuccessResponse, isJSONRPCRequest, isJSONRPCID } from "json-rpc-2.0";
-import { BundleParams } from "@reinis_frp/mev-share-client";
+import { BundleParams } from "@flashbots/mev-share-client";
 
 import {
   getProvider,
