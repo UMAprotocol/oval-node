@@ -1,7 +1,7 @@
 import { getAddress, parseEther } from "ethers";
 import dotenv from "dotenv";
 import { fallback } from "./constants";
-import { getInt, getFloat, getStringArray, getOvalConfigs, getPrivateKey } from "./helpers";
+import { getBoolean, getInt, getFloat, getStringArray, getOvalConfigs, getPrivateKey } from "./helpers";
 import { OvalConfigs } from "./types";
 dotenv.config({ path: ".env" });
 
@@ -35,4 +35,7 @@ export const env = {
   forwardUrl: getEnvVar("FORWARD_URL", fallback.forwardUrl),
   builders: getStringArray(getEnvVar("BUILDERS", JSON.stringify(fallback.builders))),
   minNetBuilderPaymentWei: parseEther(getEnvVar("MIN_NET_BUILDER_PAYMENT", fallback.minNetBuilderPayment)),
+  passThroughNonReverting: getBoolean(
+    getEnvVar("PASS_THROUGH_NON_REVERTING", fallback.passThroughNonReverting.toString()),
+  ),
 };

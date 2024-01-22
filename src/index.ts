@@ -68,11 +68,13 @@ app.post("/", async (req, res, next) => {
 
       const { mevshare, flashbotsBundleProvider } = await initClients(provider, verifiedSignatureSearcherPkey);
 
-      // Simulate the original bundle to check if it reverts without the unlock.
-      const originalSimulationResponse = await flashbotsBundleProvider.simulate(backrunTxs, targetBlock);
-      if (!originalBundleReverts(originalSimulationResponse)) {
-        await handleUnsupportedRequest(req, res); // Pass through if the original bundle doesn't revert.
-        return;
+      // If configured, simulate the original bundle to check if it reverts without the unlock.
+      if (env.passThroughNonReverting) {
+        const originalSimulationResponse = await flashbotsBundleProvider.simulate(backrunTxs, targetBlock);
+        if (!originalBundleReverts(originalSimulationResponse)) {
+          await handleUnsupportedRequest(req, res); // Pass through if the original bundle doesn't revert.
+          return;
+        }
       }
 
       Logger.debug("Finding unlock that does not revert the bundle...");
@@ -148,11 +150,13 @@ app.post("/", async (req, res, next) => {
 
       const { flashbotsBundleProvider } = await initClients(provider, verifiedSignatureSearcherPkey);
 
-      // Simulate the original bundle to check if it reverts without the unlock.
-      const originalSimulationResponse = await flashbotsBundleProvider.simulate(backrunTxs, targetBlock);
-      if (!originalBundleReverts(originalSimulationResponse)) {
-        await handleUnsupportedRequest(req, res); // Pass through if the original bundle doesn't revert.
-        return;
+      // If configured, simulate the original bundle to check if it reverts without the unlock.
+      if (env.passThroughNonReverting) {
+        const originalSimulationResponse = await flashbotsBundleProvider.simulate(backrunTxs, targetBlock);
+        if (!originalBundleReverts(originalSimulationResponse)) {
+          await handleUnsupportedRequest(req, res); // Pass through if the original bundle doesn't revert.
+          return;
+        }
       }
 
       Logger.debug("Finding unlock that does not revert the bundle...");
