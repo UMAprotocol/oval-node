@@ -1,4 +1,4 @@
-# Oval Contracts
+# Oval Node
 
 <p align="center">
   <img alt="UMA Logo" src="https://i.imgur.com/fSkkK5M.png" width="440">
