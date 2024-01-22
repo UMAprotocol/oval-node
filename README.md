@@ -62,7 +62,7 @@ The Oval node can also be built into a docker container. To do this, install doc
 docker build -t oev-node .
 ```
 
-You can the Docker container with the following:
+You can run the Docker container with the following:
 
 ```
 docker run --init --name oev-node --env-file ./.env --network host oev-node
