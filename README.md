@@ -10,7 +10,7 @@ For more information on how Oval works and how to integrate with it see the [doc
 
 ## Repo contents
 
-This repository contains the implementation of the Oval Node. This enables searchers to send standard bundles with the `eth_sendBundle` RPC method to interact with protocols that use Oval. The Node works by pre-pending an `unlockLatestValue` transaction in front of a searchers bundle before forwarding the bundle to Flashbot's MEV-share. This means that searchers dont need to know how Oval works under the hood and can simply send their existing bundles. See The [docs](https://docs.oval.xyz/for-searchers/getting-started) for integration information and details on the bundle pre-pending logic.
+This repository contains the implementation of the Oval Node. This enables searchers to send standard bundles with the `eth_sendBundle` RPC method to interact with protocols that use Oval. The Node works by pre-pending an `unlockLatestValue` transaction in front of a searchers bundle before forwarding the bundle to Flashbot's MEV-share. This means that searchers dont need to know how Oval works under the hood and can simply send their existing bundles. See the [docs](https://docs.oval.xyz/for-searchers/getting-started) for integration information and details on the bundle pre-pending logic.
 
 ## Running the Oval Node
 
