@@ -17,5 +17,5 @@ export const fallback = {
     "payload",
   ],
   minNetBuilderPayment: "0.0002",
-  passThroughNonReverting: true,
+  passThroughNonReverting: false,
 } as const;
