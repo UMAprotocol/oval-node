@@ -22,9 +22,9 @@ export function initWallets(provider: JsonRpcProvider) {
 }
 
 export async function initClients(provider: JsonRpcProvider, searcherPublicKey: string) {
-  // Derive a private key from the searcher's public key and the unlocker's private key. 
-  // This approach ensures that each searcher maintains an independent reputation within the Flashbots network, 
-  // preventing the unlocker from being impacted by a searcher's actions. 
+  // Derive a private key from the searcher's public key and the unlocker's private key.
+  // This approach ensures that each searcher maintains an independent reputation within the Flashbots network,
+  // preventing the unlocker from being impacted by a searcher's actions.
   // This is in line with Flashbots' advanced reputation management system.
   // Refer to Flashbots documentation for more details: https://docs.flashbots.net/flashbots-auction/advanced/reputation
   const derivedPrivateKey = ethers.solidityPackedKeccak256(["address", "bytes32"], [searcherPublicKey, env.authKey]);
@@ -206,14 +206,13 @@ export function getOvalConfigs(input: string): OvalConfigs {
 // Verify the bundle signature header and return the address of the private key that produced the searchers signature if
 // valid, otherwise return null.
 export function verifyBundleSignature(body: JSONRPCRequest, xFlashbotsSignatureHeader: string | string[] | undefined) {
-
-  if (typeof xFlashbotsSignatureHeader !== 'string') {
+  if (typeof xFlashbotsSignatureHeader !== "string") {
     Logger.debug(`Invalid signature header: ${xFlashbotsSignatureHeader}, expected string`);
     return null;
   }
 
-  const bundleSignaturePublicKey = xFlashbotsSignatureHeader.split(':')[0];
-  const bundleSignedMessage = xFlashbotsSignatureHeader.split(':')[1];
+  const bundleSignaturePublicKey = xFlashbotsSignatureHeader.split(":")[0];
+  const bundleSignedMessage = xFlashbotsSignatureHeader.split(":")[1];
 
   const serializedBody = JSON.stringify(body);
 
