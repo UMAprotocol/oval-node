@@ -18,7 +18,6 @@ import {
   initWallets,
   isEthCallBundleParams,
   isEthSendBundleParams,
-  ExtendedBundleParams,
   Logger,
   verifyBundleSignature,
 } from "./lib";
@@ -212,7 +211,7 @@ const createUnlockLatestValueTx = async (
     value: 0,
     gasLimit: 200000,
     data,
-    // Double the current base fee as a basic safe gas esimtate. We can make this more sophisticated in the future.
+    // Double the current base fee as a basic safe gas estimate. We can make this more sophisticated in the future.
     maxFeePerGas: baseFee * 2n,
     maxPriorityFeePerGas: 0, // searcher should pay the full tip.
   };
@@ -267,7 +266,7 @@ const findUnlock = async (
 
 const createUnlockLatestValueBundle = (signedUnlockTx: string, refundAddress: string, targetBlock: number) => {
   // Create this as a bundle. Define the max share hints and share kickback to configured refund address.
-  const bundleParams: ExtendedBundleParams = {
+  const bundleParams: BundleParams = {
     inclusion: { block: targetBlock, maxBlock: targetBlock },
     body: [{ tx: signedUnlockTx, canRevert: false }],
     validity: {
