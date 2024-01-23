@@ -86,6 +86,18 @@ export function getStringArray(input: string): string[] {
   throw new Error(`Value ${input} is valid JSON, but is not an array of strings`);
 }
 
+// A wrapper around parsing a string as a boolean that throws if the conversion fails.
+export function getBoolean(input: string): boolean {
+  const lowerCaseInput = input.toLowerCase();
+  if (lowerCaseInput === "true") {
+    return true;
+  } else if (lowerCaseInput === "false") {
+    return false;
+  } else {
+    throw new Error(`Value ${input} cannot be converted to a boolean`);
+  }
+}
+
 // Simple type guard to ensure check that a value is defined (and help typescript understand).
 export function isDefined<T>(input: T | null | undefined): input is T {
   return input !== null && input !== undefined;
