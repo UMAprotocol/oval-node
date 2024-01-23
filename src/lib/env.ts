@@ -16,9 +16,9 @@ function getEnvVar(varName: string, defaultValue?: string): string {
 let stringifiedFallbackOvalConfigs: string | undefined;
 try {
   const fallbackOvalConfigs: OvalConfigs = {
-    [getAddress(getEnvVar("OVAL_ADDRESS", fallback.ovalAddress))]: {
+    [getAddress(getEnvVar("OVAL_ADDRESS"))]: {
       unlockerKey: getPrivateKey(getEnvVar("SENDER_PRIVATE_KEY")),
-      refundAddress: getEnvVar("REFUND_ADDRESS", fallback.refundAddress),
+      refundAddress: getEnvVar("REFUND_ADDRESS"),
       refundPercent: getFloat(getEnvVar("REFUND_PERCENT", fallback.refundPercent)),
     },
   };

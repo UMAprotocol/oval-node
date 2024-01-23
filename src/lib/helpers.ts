@@ -50,13 +50,6 @@ export async function getBaseFee(provider: Provider) {
   return baseFee;
 }
 
-// Simple utility function that returns a copy of an input array with a dropped element.
-export function copyAndDrop<T>(array: T[], index: number): T[] {
-  const clone = array.slice();
-  clone.splice(index, 1);
-  return clone;
-}
-
 // A wrapper around parseFloat that throws if the output is NaN.
 export function getFloat(input: string): number {
   const output = parseFloat(input);
@@ -99,7 +92,7 @@ export function getBoolean(input: string): boolean {
 }
 
 // Simple type guard to ensure check that a value is defined (and help typescript understand).
-export function isDefined<T>(input: T | null | undefined): input is T {
+function isDefined<T>(input: T | null | undefined): input is T {
   return input !== null && input !== undefined;
 }
 
