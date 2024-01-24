@@ -1,4 +1,4 @@
-import axios from "axios";
+import axios, { AxiosError, AxiosResponse } from "axios";
 import { Request, Response, NextFunction } from "express";
 import { keccak256, concat } from "ethers";
 import { SimulationResponse, SimulationResponseSuccess } from "flashbots-ethers-v6-provider-bundle";
@@ -66,17 +66,37 @@ export function handleBundleSimulation(
   }
 }
 
+// Handler to deal with errors on forwarded requests.
+function handleForwardedRequestErrors(err: unknown, req: Request, res: Response) {
+  // Pass through Axios response if we have it, otherwise wrap as internal error.
+  if (err instanceof AxiosError && err.response !== undefined) {
+    Logger.debug("Forwarded request error", { error: err, responseData: err.response.data });
+    res.status(err.response.status).send(err.response.data);
+  } else {
+    Logger.debug("Forwarded request error", { error: err });
+    const data = err instanceof Error ? `${err.name}: ${err.message}` : null;
+    res.status(200).send(createJSONRPCErrorResponse(req.body.id, -32603, "Internal error", data));
+  }
+}
+
 // Handler that passes unsupported requests to the forwardUrl.
 export async function handleUnsupportedRequest(req: Request, res: Response) {
   const { method, body } = req;
 
   Logger.debug(`Received unsupported request! Forwarding to ${env.forwardUrl} ...`, { body });
-  const response = await axios({
-    method: method as any,
-    url: `${env.forwardUrl}`,
-    headers: { ...req.headers, host: new URL(env.forwardUrl).hostname },
-    data: body,
-  });
+
+  let response: AxiosResponse;
+  try {
+    response = await axios({
+      method: method as any,
+      url: `${env.forwardUrl}`,
+      headers: { ...req.headers, host: new URL(env.forwardUrl).hostname },
+      data: body,
+    });
+  } catch (err) {
+    handleForwardedRequestErrors(err, req, res);
+    return; // Handler already sent response to the client.
+  }
 
   const { status, data } = response;
 
