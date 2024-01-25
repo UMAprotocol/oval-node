@@ -38,4 +38,5 @@ export const env = {
   passThroughNonReverting: getBoolean(
     getEnvVar("PASS_THROUGH_NON_REVERTING", fallback.passThroughNonReverting.toString()),
   ),
+  flashbotsOrigin: getEnvVar("FLASHBOTS_ORIGIN", ""),
 };
