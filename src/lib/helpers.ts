@@ -36,10 +36,10 @@ export async function initClients(provider: JsonRpcProvider, searcherPublicKey: 
   const network = {
     streamUrl: SupportedNetworks.mainnet.streamUrl,
     apiUrl: env.forwardUrl,
-    apiHeaders: env.flashbotsOrigin !== "" ? { "x-flashbots-origin": env.flashbotsOrigin } : undefined,
+    apiHeaders: env.flashbotsOrigin !== undefined ? { "x-flashbots-origin": env.flashbotsOrigin } : undefined,
   };
   const connect = new ethers.FetchRequest(env.forwardUrl);
-  if (env.flashbotsOrigin !== "") connect.setHeader("x-flashbots-origin", env.flashbotsOrigin);
+  if (env.flashbotsOrigin !== undefined) connect.setHeader("x-flashbots-origin", env.flashbotsOrigin);
 
   // Return initialized clients for MevShare and FlashbotsBundle, both authenticated using the derived private key.
   return {
