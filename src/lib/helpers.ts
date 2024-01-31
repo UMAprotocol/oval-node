@@ -1,5 +1,5 @@
 import { JsonRpcProvider, Network, Wallet, Provider, isAddress, isHexString, Transaction, ethers } from "ethers";
-import MevShareClient from "@flashbots/mev-share-client";
+import MevShareClient, { SupportedNetworks } from "@flashbots/mev-share-client";
 import { FlashbotsBundleProvider } from "flashbots-ethers-v6-provider-bundle";
 import { env } from "./env";
 import { Logger } from "./logging";
@@ -32,10 +32,19 @@ export async function initClients(provider: JsonRpcProvider, searcherPublicKey: 
   // Create an Ethereum wallet signer using the derived private key, connected to the provided JSON RPC provider.
   const authSigner = new Wallet(derivedPrivateKey).connect(provider);
 
+  // Use custom network for MevShare and connect for FlashbotsBundle as we might need adding x-flashbots-origin headers.
+  const network = {
+    streamUrl: SupportedNetworks.mainnet.streamUrl,
+    apiUrl: env.forwardUrl,
+    apiHeaders: env.flashbotsOrigin !== undefined ? { "x-flashbots-origin": env.flashbotsOrigin } : undefined,
+  };
+  const connect = new ethers.FetchRequest(env.forwardUrl);
+  if (env.flashbotsOrigin !== undefined) connect.setHeader("x-flashbots-origin", env.flashbotsOrigin);
+
   // Return initialized clients for MevShare and FlashbotsBundle, both authenticated using the derived private key.
   return {
-    mevshare: MevShareClient.useEthereumMainnet(authSigner),
-    flashbotsBundleProvider: await FlashbotsBundleProvider.create(provider, authSigner),
+    mevshare: new MevShareClient(authSigner, network),
+    flashbotsBundleProvider: await FlashbotsBundleProvider.create(provider, authSigner, connect),
   };
 }
 
