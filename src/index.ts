@@ -35,7 +35,7 @@ const app = express();
 app.use(bodyParser.json());
 app.use(morgan("tiny"));
 app.use((req, res, next) => {
-  req.transactionId = uuidv4(); // Attach a unique transaction ID to the request object
+  req.transactionId = uuidv4();
   next();
 });
 
