@@ -19,12 +19,13 @@
     "morgan": "^1.10.0",
     "nodemon": "^3.0.1",
     "prettier": "^3.0.0",
-    "ts-node": "^10.9.1",
+    "ts-node": "^10.9.2",
     "typescript": "^5.2.2"
   },
   "devDependencies": {
     "@types/eventsource": "^1.1.11",
     "@types/node": "^18.14.4",
+    "@types/uuid": "^9.0.8",
     "@typescript-eslint/eslint-plugin": "^5.56.0",
     "@typescript-eslint/parser": "^5.56.0",
     "dotenv": "^16.3.1"
