@@ -1,7 +1,9 @@
-import express from "express";
+import express, { Request } from "express";
 import bodyParser from "body-parser";
 import dotenv from "dotenv";
 import morgan from "morgan";
+import { v4 as uuidv4 } from 'uuid';
+import './lib/express-extensions';
 
 dotenv.config();
 
@@ -32,6 +34,10 @@ import {
 const app = express();
 app.use(bodyParser.json());
 app.use(morgan("tiny"));
+app.use((req, res, next) => {
+  req.transactionId = uuidv4();
+  next();
+});
 
 const provider = getProvider();
 const unlockerWallets = initWallets(provider);
@@ -42,7 +48,7 @@ const ovalInterface = Interface.from(ovalAbi);
 app.post("/", async (req, res, next) => {
   try {
     const { url, method, body } = req;
-    Logger.debug(`Received: ${method} ${url}`, { body });
+    Logger.debug(req.transactionId, `Received: ${method} ${url}`, { body });
 
     if (!isJSONRPCRequest(body) || !isJSONRPCID(body.id)) {
       await handleUnsupportedRequest(req, res);
@@ -50,17 +56,17 @@ app.post("/", async (req, res, next) => {
     }
 
     // Verify that the signature in the request headers matches the bundle payload.
-    const verifiedSignatureSearcherPkey = verifyBundleSignature(body, req.headers["x-flashbots-signature"]);
+    const verifiedSignatureSearcherPkey = verifyBundleSignature(body, req.headers["x-flashbots-signature"], req);
 
     // Prepend the unlock transaction if the request is a valid JSON RPC 2.0 'eth_sendBundle' method with a valid bundle signature.
     if (verifiedSignatureSearcherPkey && body.method == "eth_sendBundle") {
       if (!isEthSendBundleParams(body.params)) {
-        Logger.info("Received unsupported eth_sendBundle request!", { body });
+        Logger.info(req.transactionId, "Received unsupported eth_sendBundle request!", { body });
         res.status(200).send(createJSONRPCErrorResponse(body.id, -32000, "Unsupported eth_sendBundle params"));
         return;
       }
 
-      Logger.debug("Received eth_sendBundle request!", { body });
+      Logger.debug(req.transactionId, "Received eth_sendBundle request!", { body });
 
       const backrunTxs = body.params[0].txs;
       const targetBlock = parseInt(Number(body.params[0].blockNumber).toString());
@@ -70,17 +76,17 @@ app.post("/", async (req, res, next) => {
       // If configured, simulate the original bundle to check if it reverts without the unlock.
       if (env.passThroughNonReverting) {
         const originalSimulationResponse = await flashbotsBundleProvider.simulate(backrunTxs, targetBlock);
-        if (!originalBundleReverts(originalSimulationResponse)) {
+        if (!originalBundleReverts(originalSimulationResponse, req)) {
           await handleUnsupportedRequest(req, res); // Pass through if the original bundle doesn't revert.
           return;
         }
       }
 
-      Logger.debug("Finding unlock that does not revert the bundle...");
+      Logger.debug(req.transactionId, "Finding unlock that does not revert the bundle...");
 
-      const unlock = await findUnlock(flashbotsBundleProvider, backrunTxs, targetBlock);
+      const unlock = await findUnlock(flashbotsBundleProvider, backrunTxs, targetBlock, req);
       if (!unlock) {
-        Logger.debug("No valid unlock found!");
+        Logger.debug(req.transactionId, "No valid unlock found!");
         await handleUnsupportedRequest(req, res); // Pass through if no unlock is found.
         return;
       }
@@ -93,12 +99,12 @@ app.post("/", async (req, res, next) => {
         ovalConfigs[unlock.ovalAddress].refundPercent,
       );
       if (adjustedRefundPercent <= 0) {
-        Logger.debug(`Insufficient builder payment ${unlock.simulationResponse.coinbaseDiff}`);
+        Logger.debug(req.transactionId, `Insufficient builder payment ${unlock.simulationResponse.coinbaseDiff}`);
         await handleUnsupportedRequest(req, res); // Pass through as minimum payment not met.
         return;
       }
 
-      Logger.debug(`Found valid unlock at ${unlock.ovalAddress}. Sending unlock tx bundle and backrun bundle...`);
+      Logger.debug(req.transactionId, `Found valid unlock at ${unlock.ovalAddress}. Sending unlock tx bundle and backrun bundle...`);
 
       // Construct the inner bundle with call to Oval to unlock the latest value.
       const unlockBundle = createUnlockLatestValueBundle(
@@ -131,18 +137,18 @@ app.post("/", async (req, res, next) => {
 
       const backrunResult = await mevshare.sendBundle(bundleParams);
 
-      Logger.debug("Forwarded a bundle to MEV-Share", { bundleParams });
+      Logger.debug(req.transactionId, "Forwarded a bundle to MEV-Share", { bundleParams });
 
       res.status(200).send(createJSONRPCSuccessResponse(body.id, backrunResult));
       return; // Exit the function here to prevent the request from being forwarded to the FORWARD_URL.
     } else if (verifiedSignatureSearcherPkey && body.method == "eth_callBundle") {
       if (!isEthCallBundleParams(body.params)) {
-        Logger.info("Received unsupported eth_callBundle request!", { body });
+        Logger.info(req.transactionId, "Received unsupported eth_callBundle request!", { body });
         res.status(200).send(createJSONRPCErrorResponse(body.id, -32000, "Unsupported eth_callBundle params"));
         return;
       }
 
-      Logger.debug("Received eth_callBundle request!", { body });
+      Logger.debug(req.transactionId, "Received eth_callBundle request!", { body });
 
       const backrunTxs = body.params[0].txs;
       const targetBlock = parseInt(Number(body.params[0].blockNumber).toString());
@@ -152,22 +158,22 @@ app.post("/", async (req, res, next) => {
       // If configured, simulate the original bundle to check if it reverts without the unlock.
       if (env.passThroughNonReverting) {
         const originalSimulationResponse = await flashbotsBundleProvider.simulate(backrunTxs, targetBlock);
-        if (!originalBundleReverts(originalSimulationResponse)) {
+        if (!originalBundleReverts(originalSimulationResponse, req)) {
           await handleUnsupportedRequest(req, res); // Pass through if the original bundle doesn't revert.
           return;
         }
       }
 
-      Logger.debug("Finding unlock that does not revert the bundle...");
+      Logger.debug(req.transactionId, "Finding unlock that does not revert the bundle...");
 
-      const unlock = await findUnlock(flashbotsBundleProvider, backrunTxs, targetBlock);
+      const unlock = await findUnlock(flashbotsBundleProvider, backrunTxs, targetBlock, req);
       if (!unlock) {
-        Logger.debug("No valid unlock found!");
+        Logger.debug(req.transactionId, "No valid unlock found!");
         await handleUnsupportedRequest(req, res); // Pass through if no unlock is found.
         return;
       }
 
-      Logger.debug(`Found valid unlock at ${unlock.ovalAddress}. Simulating unlock tx bundle and backrun bundle...`);
+      Logger.debug(req.transactionId, `Found valid unlock at ${unlock.ovalAddress}. Simulating unlock tx bundle and backrun bundle...`);
 
       const simulationResponse = await flashbotsBundleProvider.simulate(
         [unlock.signedUnlockTx, ...backrunTxs],
@@ -190,7 +196,7 @@ app.get("/ready", (req, res) => {
 app.use(expressErrorHandler);
 
 app.listen(env.port, () => {
-  Logger.debug(`Server is running on port ${env.port}`);
+  Logger.debug("Startup", `Server is running on port ${env.port}`);
 });
 
 const createUnlockLatestValueTx = async (
@@ -230,8 +236,9 @@ const findUnlock = async (
   flashbotsBundleProvider: FlashbotsBundleProvider,
   backrunTxs: string[],
   targetBlock: number,
+  req: express.Request,
 ) => {
-  const [baseFee, network] = await Promise.all([getBaseFee(provider), provider.getNetwork()]);
+  const [baseFee, network] = await Promise.all([getBaseFee(provider, req), provider.getNetwork()]);
   const data = ovalInterface.encodeFunctionData("unlockLatestValue");
 
   const unlocks = await Promise.all(

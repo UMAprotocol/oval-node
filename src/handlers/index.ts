@@ -8,10 +8,10 @@ import { env, Logger, stringifyBigInts } from "../lib";
 // Error handler that logs error and sends JSON-RPC error response.
 export function expressErrorHandler(err: Error, req: Request, res: Response, next: NextFunction) {
   if (err instanceof JSONRPCErrorException) {
-    Logger.error("JSON-RPC error", { error: err });
+    Logger.error(req.transactionId, "JSON-RPC error", { error: err });
     res.status(200).send(createJSONRPCErrorResponse(req.body.id, err.code, err.message, err.data));
   } else {
-    Logger.error("Internal error", { error: err });
+    Logger.error(req.transactionId, "Internal error", { error: err });
     res
       .status(200)
       .send(createJSONRPCErrorResponse(req.body.id, -32603, "Internal error", `${err.name}: ${err.message}`));
@@ -49,7 +49,7 @@ export function handleBundleSimulation(
   res: Response,
 ) {
   if ("error" in simulationResponse) {
-    Logger.debug("Simulation error", { simulationResponse });
+    Logger.debug(req.transactionId, "Simulation error", { simulationResponse });
     if (simulationResponse.error.message.includes(unlockTxHash)) {
       // Mark as internal error if the prepended unlock tx was at fault.
       res.status(200).send(createJSONRPCErrorResponse(req.body.id, -32603, "Internal error"));
@@ -70,10 +70,10 @@ export function handleBundleSimulation(
 function handleForwardedRequestErrors(err: unknown, req: Request, res: Response) {
   // Pass through Axios response if we have it, otherwise wrap as internal error.
   if (err instanceof AxiosError && err.response !== undefined) {
-    Logger.debug("Forwarded request error", { error: err, responseData: err.response.data });
+    Logger.debug(req.transactionId, "Forwarded request error", { error: err, responseData: err.response.data });
     res.status(err.response.status).send(err.response.data);
   } else {
-    Logger.debug("Forwarded request error", { error: err });
+    Logger.debug(req.transactionId, "Forwarded request error", { error: err });
     const data = err instanceof Error ? `${err.name}: ${err.message}` : null;
     res.status(200).send(createJSONRPCErrorResponse(req.body.id, -32603, "Internal error", data));
   }
@@ -83,7 +83,7 @@ function handleForwardedRequestErrors(err: unknown, req: Request, res: Response)
 export async function handleUnsupportedRequest(req: Request, res: Response) {
   const { method, body } = req;
 
-  Logger.debug(`Received unsupported request! Forwarding to ${env.forwardUrl} ...`, { body });
+  Logger.debug(req.transactionId, `Received unsupported request! Forwarding to ${env.forwardUrl} ...`, { body });
 
   let response: AxiosResponse;
   try {
@@ -104,12 +104,12 @@ export async function handleUnsupportedRequest(req: Request, res: Response) {
 }
 
 // Helper to check if the original bundle reverts without the unlock and logs for debugging.
-export function originalBundleReverts(simulationResponse: SimulationResponse) {
+export function originalBundleReverts(simulationResponse: SimulationResponse, req: Request) {
   if ("error" in simulationResponse) {
-    Logger.debug("Original bundle simulation error", { simulationResponse });
+    Logger.debug(req.transactionId, "Original bundle simulation error", { simulationResponse });
     return false;
   } else if (!simulationResponse.firstRevert || !("error" in simulationResponse.firstRevert)) {
-    Logger.debug("Original bundle simulation succeeds without unlock", stringifyBigInts({ simulationResponse }));
+    Logger.debug(req.transactionId, "Original bundle simulation succeeds without unlock", stringifyBigInts({ simulationResponse }));
     return false;
   }
   return true;

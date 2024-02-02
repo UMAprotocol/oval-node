@@ -5,6 +5,7 @@ import { env } from "./env";
 import { Logger } from "./logging";
 import { OvalConfig, OvalConfigs } from "./types";
 import { JSONRPCRequest } from "json-rpc-2.0";
+import { Request } from "express";
 
 export function getProvider() {
   return new JsonRpcProvider(env.providerUrl, new Network("mainnet", 1));
@@ -49,11 +50,11 @@ export async function initClients(provider: JsonRpcProvider, searcherPublicKey: 
 }
 
 // Function to grab the most recent base fee, for accurate gas estimation.
-export async function getBaseFee(provider: Provider) {
+export async function getBaseFee(provider: Provider, req: Request) {
   const block = await provider.getBlock("latest");
   const baseFee = block?.baseFeePerGas;
   if (!isDefined(baseFee)) {
-    Logger.debug(`Block did not contain base fee. Block received from provider ${block}`);
+    Logger.debug(req.transactionId, `Block did not contain base fee. Block received from provider ${block}`);
     throw new Error(`Block did not contain base fee. Is this running on an EIP-1559 network?`);
   }
   return baseFee;
@@ -219,9 +220,9 @@ export function getOvalConfigs(input: string): OvalConfigs {
 
 // Verify the bundle signature header and return the address of the private key that produced the searchers signature if
 // valid, otherwise return null.
-export function verifyBundleSignature(body: JSONRPCRequest, xFlashbotsSignatureHeader: string | string[] | undefined) {
+export function verifyBundleSignature(body: JSONRPCRequest, xFlashbotsSignatureHeader: string | string[] | undefined, req: Request) {
   if (typeof xFlashbotsSignatureHeader !== "string") {
-    Logger.debug(`Invalid signature header: ${xFlashbotsSignatureHeader}, expected string`);
+    Logger.debug(req.transactionId, `Invalid signature header: ${xFlashbotsSignatureHeader}, expected string`);
     return null;
   }
 
