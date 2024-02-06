@@ -138,6 +138,7 @@ app.post("/", async (req, res, next) => {
       const backrunResult = await mevshare.sendBundle(bundleParams);
 
       Logger.debug(req.transactionId, "Forwarded a bundle to MEV-Share", { bundleParams });
+      Logger.info(req.transactionId, "Bundle accepted by MEV-Share", { bundleHash: backrunResult.bundleHash });
 
       res.status(200).send(createJSONRPCSuccessResponse(body.id, backrunResult));
       return; // Exit the function here to prevent the request from being forwarded to the FORWARD_URL.
