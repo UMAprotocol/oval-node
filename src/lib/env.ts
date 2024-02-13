@@ -29,7 +29,7 @@ try {
 // Chain ID and network
 const chainId = getInt(getEnvVar("CHAIN_ID", fallback.chainId.toString()));
 if (chainId !== 1 && chainId !== 5) throw new Error(`Unsupported chainId: ${chainId}`);
-const network = chainId === 1 ? "mainnet" : "goerli";
+const network: "mainnet" | "goerli" = chainId === 1 ? "mainnet" : "goerli";
 
 export const env = {
   port: getInt(getEnvVar("PORT", fallback.port.toString())),

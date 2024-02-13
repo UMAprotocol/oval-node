@@ -36,7 +36,7 @@ export async function initClients(provider: JsonRpcProvider, searcherPublicKey: 
 
   // Use custom network for MevShare and connect for FlashbotsBundle as we might need adding x-flashbots-origin headers.
   const network = {
-    streamUrl: SupportedNetworks.mainnet.streamUrl,
+    streamUrl: SupportedNetworks[env.network].streamUrl,
     apiUrl: env.forwardUrl,
     apiHeaders: env.flashbotsOrigin !== undefined ? { "x-flashbots-origin": env.flashbotsOrigin } : undefined,
   };
