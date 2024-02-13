@@ -26,10 +26,16 @@ try {
 } catch {
   stringifiedFallbackOvalConfigs = undefined;
 }
+// Chain ID and network
+const chainId = getInt(getEnvVar("CHAIN_ID", fallback.chainId.toString()));
+if (chainId !== 1 && chainId !== 5) throw new Error(`Unsupported chainId: ${chainId}`);
+const network = chainId === 1 ? "mainnet" : "goerli";
 
 export const env = {
   port: getInt(getEnvVar("PORT", fallback.port.toString())),
   authKey: getPrivateKey(getEnvVar("AUTH_PRIVATE_KEY")),
+  chainId,
+  network,
   providerUrl: getEnvVar("PROVIDER_URL"),
   ovalConfigs: getOvalConfigs(getEnvVar("OVAL_CONFIGS", stringifiedFallbackOvalConfigs)),
   forwardUrl: getEnvVar("FORWARD_URL", fallback.forwardUrl),

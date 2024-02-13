@@ -33,12 +33,30 @@ yarn
 Define a `.env` file and define, at minimum, the following (see [here](./src/lib/env.ts) for more settings):
 
 ```
-OVAL_ADDRESS=0x420 // The address of the Oval contract you want to target with the Oval Node.
-SENDER_PRIVATE_KEY=0x6969 // The private key of the permissioned actor who can call unlockLatestValue on the associated Oval.
-AUTH_PRIVATE_KEY=0x6666 // The root private key used to derive searcher specific keys for signing bundles.
-REFUND_ADDRESS=0x42069 // The refund address you want to send the OEV kickback to.
-PROVIDER_URL=https://mainnet.infura.io/v3/abcdef // Ethereum mainnet RPC provider.
+SENDER_PRIVATE_KEY=<your_sender_private_key>  # Private key of the actor authorized to call unlockLatestValue on the Oval.
+AUTH_PRIVATE_KEY=<your_auth_private_key>      # Root private key for deriving searcher-specific keys for signing bundles.
+PROVIDER_URL=<your_provider_url>              # Ethereum mainnet/goerli RPC provider URL.
+BUILDERS=<builders_json_array>                # JSON array specifying the builders for MEV-Share.
+CHAIN_ID=<network_chain_id>                   # Chain ID of the Ethereum network you are targeting, 1 or 5 for mainnet or goerli.
+OVAL_CONFIGS=<oval_configs_json>              # JSON string that maps Oval contract addresses to their specific configurations.
 ```
+
+`OVAL_CONFIGS` is a JSON string that maps Oval contract addresses to their specific configurations. Each entry in this JSON object should have the following format:
+
+```json
+{
+  "<Oval_Contract_Address>": {
+    "unlockerKey": "<Unlocker_Private_Key>",
+    "refundAddress": "<Refund_Address>",
+    "refundPercent": <Refund_Percentage>
+  }
+}
+```
+
+- `Oval_Contract_Address`: The Ethereum address of the Oval instance.
+- `Unlocker_Private_Key`: The private key of the wallet permitted to unlock prices in the specified Oval contract.
+- `Refund_Address`: The Ethereum address where refunds will be sent.
+- `Refund_Percentage`: The percentage of the builder payment amount to be refunded.
 
 ### 2. Build & run the Oval Node:
 
@@ -73,4 +91,3 @@ docker run --init --name oval-node --env-file ./.env --network host oval-node
 ## License
 
 All code in this repository is licensed under BUSL-1.1 unless specified differently in the file. Individual exceptions to this license can be made by Risk Labs, which holds the rights to this software and design. If you are interested in using the code or designs in a derivative work, feel free to reach out to licensing@risklabs.foundation.
-

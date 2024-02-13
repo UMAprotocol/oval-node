@@ -22,6 +22,7 @@ import {
   isEthSendBundleParams,
   Logger,
   verifyBundleSignature,
+  getMaxBlockByChainId,
 } from "./lib";
 import { ovalAbi } from "./abi";
 import {
@@ -124,7 +125,7 @@ app.post("/", async (req, res, next) => {
       const bundleParams: BundleParams = {
         inclusion: {
           block: targetBlock,
-          maxBlock: targetBlock,
+          maxBlock: getMaxBlockByChainId(env.chainId, targetBlock),
         },
         body: bundle,
         privacy: {
@@ -275,7 +276,7 @@ const findUnlock = async (
 const createUnlockLatestValueBundle = (signedUnlockTx: string, refundAddress: string, targetBlock: number) => {
   // Create this as a bundle. Define the max share hints and share kickback to configured refund address.
   const bundleParams: BundleParams = {
-    inclusion: { block: targetBlock, maxBlock: targetBlock },
+    inclusion: { block: targetBlock, maxBlock: getMaxBlockByChainId(env.chainId, targetBlock) },
     body: [{ tx: signedUnlockTx, canRevert: false }],
     validity: {
       refundConfig: [

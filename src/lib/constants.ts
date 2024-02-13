@@ -1,4 +1,5 @@
 export const fallback = {
+  chainId: 1,
   port: 3000,
   forwardUrl: "https://relay.flashbots.net",
   refundPercent: "90",

@@ -8,7 +8,8 @@ import { JSONRPCRequest } from "json-rpc-2.0";
 import { Request } from "express";
 
 export function getProvider() {
-  return new JsonRpcProvider(env.providerUrl, new Network("mainnet", 1));
+  const network = new Network(env.network, env.chainId);
+  return new JsonRpcProvider(env.providerUrl, network);
 }
 
 // Initialize unlocker wallets for each Oval instance.
@@ -247,3 +248,17 @@ export function getPrivateKey(input: string): string {
   if (!isHexString(privateKey, 32)) throw new Error(`Value ${input} not a valid private key`);
   return privateKey;
 }
+// Calculate the maximum block number to target with bundles by chainId.
+// In mainnet this is always the targetBlock, but in Goerli we add 24 blocks to the targetBlock.
+export function getMaxBlockByChainId(chainId: number, targetBlock: number) {
+  const GOERLI_CHAIN_ID = 5;
+
+  // For the Goerli network set the maxBlock to the maximum allowed by MEV-Share, that is 25 blocks ahead of the current block. 
+  // Since the targetBlock is already considered one block ahead, we add an additional 24 blocks for Goerli.
+  const ADDITIONAL_BLOCKS_GOERLI = 24;
+
+  const isGoerli = chainId === GOERLI_CHAIN_ID;
+  const goerliMaxBlock = targetBlock + ADDITIONAL_BLOCKS_GOERLI;
+
+  return isGoerli ? goerliMaxBlock : targetBlock;
+};
