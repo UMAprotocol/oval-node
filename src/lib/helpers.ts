@@ -6,10 +6,10 @@ import { Logger } from "./logging";
 import { OvalConfig, OvalConfigs } from "./types";
 import { JSONRPCRequest } from "json-rpc-2.0";
 import { Request } from "express";
-import { chainIdBlockOffsets, networkNames } from "./constants";
+import { chainIdBlockOffsets, supportedNetworks } from "./constants";
 
 export function getProvider() {
-  const network = new Network(networkNames[env.chainId], env.chainId);
+  const network = new Network(supportedNetworks[env.chainId], env.chainId);
   return new JsonRpcProvider(env.providerUrl, network);
 }
 
@@ -37,7 +37,7 @@ export async function initClients(provider: JsonRpcProvider, searcherPublicKey: 
 
   // Use custom network for MevShare and connect for FlashbotsBundle as we might need adding x-flashbots-origin headers.
   const network = {
-    streamUrl: SupportedNetworks[networkNames[env.chainId]].streamUrl,
+    streamUrl: SupportedNetworks[supportedNetworks[env.chainId]].streamUrl,
     apiUrl: env.forwardUrl,
     apiHeaders: env.flashbotsOrigin !== undefined ? { "x-flashbots-origin": env.flashbotsOrigin } : undefined,
   };

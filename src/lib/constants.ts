@@ -23,7 +23,7 @@ export const MAINNET_CHAIN_ID = 1;
 export const GOERLI_CHAIN_ID = 5;
 
 type SupportedNetworks = "mainnet" | "goerli";
-export const networkNames: {
+export const supportedNetworks: {
   [key: number]: SupportedNetworks;
 } = {
   [MAINNET_CHAIN_ID]: "mainnet",
