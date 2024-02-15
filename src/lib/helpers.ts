@@ -255,13 +255,7 @@ export function getPrivateKey(input: string): string {
 }
 
 // Calculate the maximum block number to target with bundles by chainId.
-// In mainnet this is always the targetBlock, but in Goerli we add 24 blocks to the targetBlock.
 export function getMaxBlockByChainId(chainId: number, targetBlock: number) {
-  // Check if the chain ID is supported
-  if (chainIdBlockOffsets[chainId] === undefined) {
-    throw new Error(`Unsupported chain ID: ${chainId}`);
-  }
-
-  // Calculate max block number
+  // In mainnet this is always the targetBlock, but in Goerli we add 24 blocks to the targetBlock.
   return targetBlock + chainIdBlockOffsets[chainId];
 }
