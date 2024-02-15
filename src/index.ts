@@ -2,8 +2,8 @@ import express, { Request } from "express";
 import bodyParser from "body-parser";
 import dotenv from "dotenv";
 import morgan from "morgan";
-import { v4 as uuidv4 } from 'uuid';
-import './lib/express-extensions';
+import { v4 as uuidv4 } from "uuid";
+import "./lib/express-extensions";
 
 dotenv.config();
 
@@ -22,6 +22,7 @@ import {
   isEthSendBundleParams,
   Logger,
   verifyBundleSignature,
+  getMaxBlockByChainId,
 } from "./lib";
 import { ovalAbi } from "./abi";
 import {
@@ -104,7 +105,10 @@ app.post("/", async (req, res, next) => {
         return;
       }
 
-      Logger.debug(req.transactionId, `Found valid unlock at ${unlock.ovalAddress}. Sending unlock tx bundle and backrun bundle...`);
+      Logger.debug(
+        req.transactionId,
+        `Found valid unlock at ${unlock.ovalAddress}. Sending unlock tx bundle and backrun bundle...`,
+      );
 
       // Construct the inner bundle with call to Oval to unlock the latest value.
       const unlockBundle = createUnlockLatestValueBundle(
@@ -124,7 +128,7 @@ app.post("/", async (req, res, next) => {
       const bundleParams: BundleParams = {
         inclusion: {
           block: targetBlock,
-          maxBlock: targetBlock,
+          maxBlock: getMaxBlockByChainId(env.chainId, targetBlock),
         },
         body: bundle,
         privacy: {
@@ -174,7 +178,10 @@ app.post("/", async (req, res, next) => {
         return;
       }
 
-      Logger.debug(req.transactionId, `Found valid unlock at ${unlock.ovalAddress}. Simulating unlock tx bundle and backrun bundle...`);
+      Logger.debug(
+        req.transactionId,
+        `Found valid unlock at ${unlock.ovalAddress}. Simulating unlock tx bundle and backrun bundle...`,
+      );
 
       const simulationResponse = await flashbotsBundleProvider.simulate(
         [unlock.signedUnlockTx, ...backrunTxs],
@@ -275,7 +282,7 @@ const findUnlock = async (
 const createUnlockLatestValueBundle = (signedUnlockTx: string, refundAddress: string, targetBlock: number) => {
   // Create this as a bundle. Define the max share hints and share kickback to configured refund address.
   const bundleParams: BundleParams = {
-    inclusion: { block: targetBlock, maxBlock: targetBlock },
+    inclusion: { block: targetBlock, maxBlock: getMaxBlockByChainId(env.chainId, targetBlock) },
     body: [{ tx: signedUnlockTx, canRevert: false }],
     validity: {
       refundConfig: [

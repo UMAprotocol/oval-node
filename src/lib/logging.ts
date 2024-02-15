@@ -3,7 +3,7 @@ import { AugmentedLogger, Logger as LoggerModule } from "@uma/logger";
 export class Logger {
   private static instance: AugmentedLogger;
 
-  private constructor() { }
+  private constructor() {}
 
   static getInstance(): AugmentedLogger {
     if (!Logger.instance) {

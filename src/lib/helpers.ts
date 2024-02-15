@@ -6,9 +6,11 @@ import { Logger } from "./logging";
 import { OvalConfig, OvalConfigs } from "./types";
 import { JSONRPCRequest } from "json-rpc-2.0";
 import { Request } from "express";
+import { chainIdBlockOffsets, supportedNetworks } from "./constants";
 
 export function getProvider() {
-  return new JsonRpcProvider(env.providerUrl, new Network("mainnet", 1));
+  const network = new Network(supportedNetworks[env.chainId], env.chainId);
+  return new JsonRpcProvider(env.providerUrl, network);
 }
 
 // Initialize unlocker wallets for each Oval instance.
@@ -35,7 +37,7 @@ export async function initClients(provider: JsonRpcProvider, searcherPublicKey: 
 
   // Use custom network for MevShare and connect for FlashbotsBundle as we might need adding x-flashbots-origin headers.
   const network = {
-    streamUrl: SupportedNetworks.mainnet.streamUrl,
+    streamUrl: SupportedNetworks[supportedNetworks[env.chainId]].streamUrl,
     apiUrl: env.forwardUrl,
     apiHeaders: env.flashbotsOrigin !== undefined ? { "x-flashbots-origin": env.flashbotsOrigin } : undefined,
   };
@@ -220,7 +222,11 @@ export function getOvalConfigs(input: string): OvalConfigs {
 
 // Verify the bundle signature header and return the address of the private key that produced the searchers signature if
 // valid, otherwise return null.
-export function verifyBundleSignature(body: JSONRPCRequest, xFlashbotsSignatureHeader: string | string[] | undefined, req: Request) {
+export function verifyBundleSignature(
+  body: JSONRPCRequest,
+  xFlashbotsSignatureHeader: string | string[] | undefined,
+  req: Request,
+) {
   if (typeof xFlashbotsSignatureHeader !== "string") {
     Logger.debug(req.transactionId, `Invalid signature header: ${xFlashbotsSignatureHeader}, expected string`);
     return null;
@@ -246,4 +252,10 @@ export function getPrivateKey(input: string): string {
   const privateKey = input.startsWith("0x") ? input : "0x" + input;
   if (!isHexString(privateKey, 32)) throw new Error(`Value ${input} not a valid private key`);
   return privateKey;
+}
+
+// Calculate the maximum block number to target with bundles by chainId.
+export function getMaxBlockByChainId(chainId: number, targetBlock: number) {
+  // In mainnet this is always the targetBlock, but in Goerli we add 24 blocks to the targetBlock.
+  return targetBlock + chainIdBlockOffsets[chainId];
 }

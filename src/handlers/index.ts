@@ -109,7 +109,11 @@ export function originalBundleReverts(simulationResponse: SimulationResponse, re
     Logger.debug(req.transactionId, "Original bundle simulation error", { simulationResponse });
     return false;
   } else if (!simulationResponse.firstRevert || !("error" in simulationResponse.firstRevert)) {
-    Logger.debug(req.transactionId, "Original bundle simulation succeeds without unlock", stringifyBigInts({ simulationResponse }));
+    Logger.debug(
+      req.transactionId,
+      "Original bundle simulation succeeds without unlock",
+      stringifyBigInts({ simulationResponse }),
+    );
     return false;
   }
   return true;

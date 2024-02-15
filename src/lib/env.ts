@@ -1,6 +1,6 @@
 import { getAddress, parseEther } from "ethers";
 import dotenv from "dotenv";
-import { fallback } from "./constants";
+import { fallback, supportedNetworks } from "./constants";
 import { getBoolean, getInt, getFloat, getStringArray, getOvalConfigs, getPrivateKey } from "./helpers";
 import { OvalConfigs } from "./types";
 dotenv.config({ path: ".env" });
@@ -26,10 +26,16 @@ try {
 } catch {
   stringifiedFallbackOvalConfigs = undefined;
 }
+// Chain ID and network
+const chainId = getInt(getEnvVar("CHAIN_ID", fallback.chainId.toString()));
+if (!supportedNetworks[chainId]) {
+  throw new Error(`Unsupported chainId: ${chainId}`);
+}
 
 export const env = {
   port: getInt(getEnvVar("PORT", fallback.port.toString())),
   authKey: getPrivateKey(getEnvVar("AUTH_PRIVATE_KEY")),
+  chainId,
   providerUrl: getEnvVar("PROVIDER_URL"),
   ovalConfigs: getOvalConfigs(getEnvVar("OVAL_CONFIGS", stringifiedFallbackOvalConfigs)),
   forwardUrl: getEnvVar("FORWARD_URL", fallback.forwardUrl),
