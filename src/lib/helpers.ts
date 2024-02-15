@@ -6,9 +6,10 @@ import { Logger } from "./logging";
 import { OvalConfig, OvalConfigs } from "./types";
 import { JSONRPCRequest } from "json-rpc-2.0";
 import { Request } from "express";
+import { chainIdBlockOffsets, networkNames } from "./constants";
 
 export function getProvider() {
-  const network = new Network(env.network, env.chainId);
+  const network = new Network(networkNames[env.chainId], env.chainId);
   return new JsonRpcProvider(env.providerUrl, network);
 }
 
@@ -36,7 +37,7 @@ export async function initClients(provider: JsonRpcProvider, searcherPublicKey: 
 
   // Use custom network for MevShare and connect for FlashbotsBundle as we might need adding x-flashbots-origin headers.
   const network = {
-    streamUrl: SupportedNetworks[env.network].streamUrl,
+    streamUrl: SupportedNetworks[networkNames[env.chainId]].streamUrl,
     apiUrl: env.forwardUrl,
     apiHeaders: env.flashbotsOrigin !== undefined ? { "x-flashbots-origin": env.flashbotsOrigin } : undefined,
   };
@@ -221,7 +222,11 @@ export function getOvalConfigs(input: string): OvalConfigs {
 
 // Verify the bundle signature header and return the address of the private key that produced the searchers signature if
 // valid, otherwise return null.
-export function verifyBundleSignature(body: JSONRPCRequest, xFlashbotsSignatureHeader: string | string[] | undefined, req: Request) {
+export function verifyBundleSignature(
+  body: JSONRPCRequest,
+  xFlashbotsSignatureHeader: string | string[] | undefined,
+  req: Request,
+) {
   if (typeof xFlashbotsSignatureHeader !== "string") {
     Logger.debug(req.transactionId, `Invalid signature header: ${xFlashbotsSignatureHeader}, expected string`);
     return null;
@@ -248,17 +253,15 @@ export function getPrivateKey(input: string): string {
   if (!isHexString(privateKey, 32)) throw new Error(`Value ${input} not a valid private key`);
   return privateKey;
 }
+
 // Calculate the maximum block number to target with bundles by chainId.
 // In mainnet this is always the targetBlock, but in Goerli we add 24 blocks to the targetBlock.
 export function getMaxBlockByChainId(chainId: number, targetBlock: number) {
-  const GOERLI_CHAIN_ID = 5;
+  // Check if the chain ID is supported
+  if (chainIdBlockOffsets[chainId] === undefined) {
+    throw new Error(`Unsupported chain ID: ${chainId}`);
+  }
 
-  // For the Goerli network set the maxBlock to the maximum allowed by MEV-Share, that is 25 blocks ahead of the current block. 
-  // Since the targetBlock is already considered one block ahead, we add an additional 24 blocks for Goerli.
-  const ADDITIONAL_BLOCKS_GOERLI = 24;
-
-  const isGoerli = chainId === GOERLI_CHAIN_ID;
-  const goerliMaxBlock = targetBlock + ADDITIONAL_BLOCKS_GOERLI;
-
-  return isGoerli ? goerliMaxBlock : targetBlock;
-};
+  // Calculate max block number
+  return targetBlock + chainIdBlockOffsets[chainId];
+}

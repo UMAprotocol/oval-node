@@ -18,3 +18,21 @@ export const fallback = {
   minNetBuilderPayment: "0",
   passThroughNonReverting: false,
 } as const;
+
+export const MAINNET_CHAIN_ID = 1;
+export const GOERLI_CHAIN_ID = 5;
+
+type SupportedNetworks = "mainnet" | "goerli";
+export const networkNames: {
+  [key: number]: SupportedNetworks;
+} = {
+  [MAINNET_CHAIN_ID]: "mainnet",
+  [GOERLI_CHAIN_ID]: "goerli",
+};
+
+export const chainIdBlockOffsets: {
+  [key: number]: number;
+} = {
+  [MAINNET_CHAIN_ID]: 0,
+  [GOERLI_CHAIN_ID]: 24,
+};

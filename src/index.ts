@@ -2,8 +2,8 @@ import express, { Request } from "express";
 import bodyParser from "body-parser";
 import dotenv from "dotenv";
 import morgan from "morgan";
-import { v4 as uuidv4 } from 'uuid';
-import './lib/express-extensions';
+import { v4 as uuidv4 } from "uuid";
+import "./lib/express-extensions";
 
 dotenv.config();
 
@@ -105,7 +105,10 @@ app.post("/", async (req, res, next) => {
         return;
       }
 
-      Logger.debug(req.transactionId, `Found valid unlock at ${unlock.ovalAddress}. Sending unlock tx bundle and backrun bundle...`);
+      Logger.debug(
+        req.transactionId,
+        `Found valid unlock at ${unlock.ovalAddress}. Sending unlock tx bundle and backrun bundle...`,
+      );
 
       // Construct the inner bundle with call to Oval to unlock the latest value.
       const unlockBundle = createUnlockLatestValueBundle(
@@ -175,7 +178,10 @@ app.post("/", async (req, res, next) => {
         return;
       }
 
-      Logger.debug(req.transactionId, `Found valid unlock at ${unlock.ovalAddress}. Simulating unlock tx bundle and backrun bundle...`);
+      Logger.debug(
+        req.transactionId,
+        `Found valid unlock at ${unlock.ovalAddress}. Simulating unlock tx bundle and backrun bundle...`,
+      );
 
       const simulationResponse = await flashbotsBundleProvider.simulate(
         [unlock.signedUnlockTx, ...backrunTxs],

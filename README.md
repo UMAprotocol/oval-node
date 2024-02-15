@@ -33,12 +33,16 @@ yarn
 Define a `.env` file and define, at minimum, the following (see [here](./src/lib/env.ts) for more settings):
 
 ```
-SENDER_PRIVATE_KEY=<your_sender_private_key>  # Private key of the actor authorized to call unlockLatestValue on the Oval.
+OVAL_CONFIGS=<oval_configs_json>              # JSON string that maps Oval contract addresses to their specific configurations (see below).
+OVAL_ADDRESS=0x420                            # (Only if not using OVAL_CONFIGS) The address of the Oval contract you want to target with the Oval Node.
+REFUND_ADDRESS=0x42069                        # (Only if not using OVAL_CONFIGS) The refund address you want to send the OEV kickback to.
+REFUND_PERCENT=0.5                            # (Only if not using OVAL_CONFIGS) The percentage of the OEV kickback to send to the refund address.
+SENDER_PRIVATE_KEY=<your_sender_private_key>  # (Only if not using OVAL_CONFIGS) Private key of the actor authorized to call unlockLatestValue on the Oval.
+
 AUTH_PRIVATE_KEY=<your_auth_private_key>      # Root private key for deriving searcher-specific keys for signing bundles.
 PROVIDER_URL=<your_provider_url>              # Ethereum mainnet/goerli RPC provider URL.
 BUILDERS=<builders_json_array>                # JSON array specifying the builders for MEV-Share.
 CHAIN_ID=<network_chain_id>                   # Chain ID of the Ethereum network you are targeting, 1 or 5 for mainnet or goerli.
-OVAL_CONFIGS=<oval_configs_json>              # JSON string that maps Oval contract addresses to their specific configurations.
 ```
 
 `OVAL_CONFIGS` is a JSON string that maps Oval contract addresses to their specific configurations. Each entry in this JSON object should have the following format:
@@ -56,7 +60,7 @@ OVAL_CONFIGS=<oval_configs_json>              # JSON string that maps Oval contr
 - `Oval_Contract_Address`: The Ethereum address of the Oval instance.
 - `Unlocker_Private_Key`: The private key of the wallet permitted to unlock prices in the specified Oval contract.
 - `Refund_Address`: The Ethereum address where refunds will be sent.
-- `Refund_Percentage`: The percentage of the builder payment amount to be refunded.
+- `Refund_Percentage`: The percentage of the OEV kickback to send to the refund address.
 
 ### 2. Build & run the Oval Node:
 
