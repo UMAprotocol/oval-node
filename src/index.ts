@@ -52,7 +52,7 @@ app.post("/", async (req, res, next) => {
     Logger.debug(req.transactionId, `Received: ${method} ${url}`, { body });
 
     if (!isJSONRPCRequest(body) || !isJSONRPCID(body.id)) {
-      await handleUnsupportedRequest(req, res);
+      await handleUnsupportedRequest(req, res, "Invalid JSON RPC request");
       return;
     }
 
@@ -78,7 +78,7 @@ app.post("/", async (req, res, next) => {
       if (env.passThroughNonReverting) {
         const originalSimulationResponse = await flashbotsBundleProvider.simulate(backrunTxs, targetBlock);
         if (!originalBundleReverts(originalSimulationResponse, req)) {
-          await handleUnsupportedRequest(req, res); // Pass through if the original bundle doesn't revert.
+          await handleUnsupportedRequest(req, res, "Original bundle does not revert"); // Pass through if the original bundle doesn't revert.
           return;
         }
       }
@@ -88,7 +88,7 @@ app.post("/", async (req, res, next) => {
       const unlock = await findUnlock(flashbotsBundleProvider, backrunTxs, targetBlock, req);
       if (!unlock) {
         Logger.debug(req.transactionId, "No valid unlock found!");
-        await handleUnsupportedRequest(req, res); // Pass through if no unlock is found.
+        await handleUnsupportedRequest(req, res, "No valid unlock found"); // Pass through if no unlock is found.
         return;
       }
 
@@ -101,7 +101,7 @@ app.post("/", async (req, res, next) => {
       );
       if (adjustedRefundPercent <= 0) {
         Logger.debug(req.transactionId, `Insufficient builder payment ${unlock.simulationResponse.coinbaseDiff}`);
-        await handleUnsupportedRequest(req, res); // Pass through as minimum payment not met.
+        await handleUnsupportedRequest(req, res, "Insufficient builder payment"); // Pass through as minimum payment not met.
         return;
       }
 
@@ -164,7 +164,7 @@ app.post("/", async (req, res, next) => {
       if (env.passThroughNonReverting) {
         const originalSimulationResponse = await flashbotsBundleProvider.simulate(backrunTxs, targetBlock);
         if (!originalBundleReverts(originalSimulationResponse, req)) {
-          await handleUnsupportedRequest(req, res); // Pass through if the original bundle doesn't revert.
+          await handleUnsupportedRequest(req, res, "Original bundle does not revert"); // Pass through if the original bundle doesn't revert.
           return;
         }
       }
@@ -174,7 +174,7 @@ app.post("/", async (req, res, next) => {
       const unlock = await findUnlock(flashbotsBundleProvider, backrunTxs, targetBlock, req);
       if (!unlock) {
         Logger.debug(req.transactionId, "No valid unlock found!");
-        await handleUnsupportedRequest(req, res); // Pass through if no unlock is found.
+        await handleUnsupportedRequest(req, res, "No valid unlock found"); // Pass through if no unlock is found.
         return;
       }
 
@@ -190,7 +190,7 @@ app.post("/", async (req, res, next) => {
 
       // Send back the simulation response without the unlock transaction.
       handleBundleSimulation(simulationResponse, unlock.unlockTxHash, req, res);
-    } else await handleUnsupportedRequest(req, res);
+    } else await handleUnsupportedRequest(req, res, "Invalid signature or method");
   } catch (error) {
     next(error);
   }
