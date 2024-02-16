@@ -12,21 +12,22 @@ export class Logger {
     return Logger.instance;
   }
 
-  static info(message: string, ...args: { [key: string]: any }[]) {
-    Logger.getInstance().info(Logger.getLogBody("ℹ️ " + message, ...args));
+  static info(transactionId: string, message: string, ...args: { [key: string]: any }[]) {
+    Logger.getInstance().info(Logger.getLogBody(message + " ℹ️", transactionId, ...args));
   }
 
-  static error(message: string, ...args: { [key: string]: any }[]) {
-    Logger.getInstance().error(Logger.getLogBody("🚨 " + message, ...args));
+  static error(transactionId: string, message: string, ...args: { [key: string]: any }[]) {
+    Logger.getInstance().error(Logger.getLogBody(message + " 🚨", transactionId, ...args));
   }
 
-  static debug(message: string, ...args: { [key: string]: any }[]) {
-    Logger.getInstance().debug(Logger.getLogBody(message, ...args));
+  static debug(transactionId: string, message: string, ...args: { [key: string]: any }[]) {
+    Logger.getInstance().debug(Logger.getLogBody(message, transactionId, ...args));
   }
 
-  static getLogBody(message: string, ...args: { [key: string]: any }[]): { [key: string]: any } {
+  static getLogBody(message: string, transactionId: string, ...args: { [key: string]: any }[]): { [key: string]: any } {
     return {
       at: "Oval-RPC",
+      transactionId,
       message,
       ...Object.assign({}, ...args),
     };

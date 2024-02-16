@@ -1,13 +1,16 @@
 import { JsonRpcProvider, Network, Wallet, Provider, isAddress, isHexString, Transaction, ethers } from "ethers";
-import MevShareClient from "@flashbots/mev-share-client";
+import MevShareClient, { SupportedNetworks } from "@flashbots/mev-share-client";
 import { FlashbotsBundleProvider } from "flashbots-ethers-v6-provider-bundle";
 import { env } from "./env";
 import { Logger } from "./logging";
 import { OvalConfig, OvalConfigs } from "./types";
 import { JSONRPCRequest } from "json-rpc-2.0";
+import { Request } from "express";
+import { chainIdBlockOffsets, supportedNetworks } from "./constants";
 
 export function getProvider() {
-  return new JsonRpcProvider(env.providerUrl, new Network("mainnet", 1));
+  const network = new Network(supportedNetworks[env.chainId], env.chainId);
+  return new JsonRpcProvider(env.providerUrl, network);
 }
 
 // Initialize unlocker wallets for each Oval instance.
@@ -32,19 +35,28 @@ export async function initClients(provider: JsonRpcProvider, searcherPublicKey: 
   // Create an Ethereum wallet signer using the derived private key, connected to the provided JSON RPC provider.
   const authSigner = new Wallet(derivedPrivateKey).connect(provider);
 
+  // Use custom network for MevShare and connect for FlashbotsBundle as we might need adding x-flashbots-origin headers.
+  const network = {
+    streamUrl: SupportedNetworks[supportedNetworks[env.chainId]].streamUrl,
+    apiUrl: env.forwardUrl,
+    apiHeaders: env.flashbotsOrigin !== undefined ? { "x-flashbots-origin": env.flashbotsOrigin } : undefined,
+  };
+  const connect = new ethers.FetchRequest(env.forwardUrl);
+  if (env.flashbotsOrigin !== undefined) connect.setHeader("x-flashbots-origin", env.flashbotsOrigin);
+
   // Return initialized clients for MevShare and FlashbotsBundle, both authenticated using the derived private key.
   return {
-    mevshare: MevShareClient.useEthereumMainnet(authSigner),
-    flashbotsBundleProvider: await FlashbotsBundleProvider.create(provider, authSigner),
+    mevshare: new MevShareClient(authSigner, network),
+    flashbotsBundleProvider: await FlashbotsBundleProvider.create(provider, authSigner, connect),
   };
 }
 
 // Function to grab the most recent base fee, for accurate gas estimation.
-export async function getBaseFee(provider: Provider) {
+export async function getBaseFee(provider: Provider, req: Request) {
   const block = await provider.getBlock("latest");
   const baseFee = block?.baseFeePerGas;
   if (!isDefined(baseFee)) {
-    Logger.debug(`Block did not contain base fee. Block received from provider ${block}`);
+    Logger.debug(req.transactionId, `Block did not contain base fee. Block received from provider ${block}`);
     throw new Error(`Block did not contain base fee. Is this running on an EIP-1559 network?`);
   }
   return baseFee;
@@ -210,9 +222,13 @@ export function getOvalConfigs(input: string): OvalConfigs {
 
 // Verify the bundle signature header and return the address of the private key that produced the searchers signature if
 // valid, otherwise return null.
-export function verifyBundleSignature(body: JSONRPCRequest, xFlashbotsSignatureHeader: string | string[] | undefined) {
+export function verifyBundleSignature(
+  body: JSONRPCRequest,
+  xFlashbotsSignatureHeader: string | string[] | undefined,
+  req: Request,
+) {
   if (typeof xFlashbotsSignatureHeader !== "string") {
-    Logger.debug(`Invalid signature header: ${xFlashbotsSignatureHeader}, expected string`);
+    Logger.debug(req.transactionId, `Invalid signature header: ${xFlashbotsSignatureHeader}, expected string`);
     return null;
   }
 
@@ -236,4 +252,10 @@ export function getPrivateKey(input: string): string {
   const privateKey = input.startsWith("0x") ? input : "0x" + input;
   if (!isHexString(privateKey, 32)) throw new Error(`Value ${input} not a valid private key`);
   return privateKey;
+}
+
+// Calculate the maximum block number to target with bundles by chainId.
+export function getMaxBlockByChainId(chainId: number, targetBlock: number) {
+  // In mainnet this is always the targetBlock, but in Goerli we add 24 blocks to the targetBlock.
+  return targetBlock + chainIdBlockOffsets[chainId];
 }
