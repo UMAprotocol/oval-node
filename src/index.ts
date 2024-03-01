@@ -62,7 +62,7 @@ app.post("/", async (req, res, next) => {
     // Prepend the unlock transaction if the request is a valid JSON RPC 2.0 'eth_sendBundle' method with a valid bundle signature.
     if (verifiedSignatureSearcherPkey && body.method == "eth_sendBundle") {
       if (!isEthSendBundleParams(body.params)) {
-        Logger.info(req.transactionId, "Received unsupported eth_sendBundle request!", { body });
+        Logger.debug(req.transactionId, "Received unsupported eth_sendBundle request!", { body });
         res.status(200).send(createJSONRPCErrorResponse(body.id, -32000, "Unsupported eth_sendBundle params"));
         return;
       }
@@ -148,7 +148,7 @@ app.post("/", async (req, res, next) => {
       return; // Exit the function here to prevent the request from being forwarded to the FORWARD_URL.
     } else if (verifiedSignatureSearcherPkey && body.method == "eth_callBundle") {
       if (!isEthCallBundleParams(body.params)) {
-        Logger.info(req.transactionId, "Received unsupported eth_callBundle request!", { body });
+        Logger.debug(req.transactionId, "Received unsupported eth_callBundle request!", { body });
         res.status(200).send(createJSONRPCErrorResponse(body.id, -32000, "Unsupported eth_callBundle params"));
         return;
       }
