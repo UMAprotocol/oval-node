@@ -67,3 +67,7 @@ export const flashbotsSupportedNetworks: {
     apiUrl: "https://relay-sepolia.flashbots.net"
   }
 }
+
+export const FLASHBOTS_SIGNATURE_HEADER = "x-flashbots-signature";
+
+export const OVAL_CONFIG_HEADER = "x-oval-config";
