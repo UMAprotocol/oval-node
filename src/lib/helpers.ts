@@ -252,7 +252,6 @@ export const calculateBundleRefunds = (unlockAddresses: string[], ovalConfigs: O
   const refunds = new Map<string, Refund>();
   // We split the refund percentage equally between the unlock addresses and for each we calculate the refund according
   // Oval instance refund percentage in OvalConfigs.
-  // Note: In the future we might want to support different refund percentages for different unlock addresses.
   const split = 100 / unlockAddresses.length;
   for (let i = 0; i < unlockAddresses.length; i++) {
     const ovalAddress = unlockAddresses[i];
