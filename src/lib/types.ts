@@ -15,7 +15,7 @@ export type Refund = {
 export interface OvalHeaderConfigs {
   unlockAddresses: {
     ovalAddress: string;
-  }[]
+  }[];
 }
 
 type EthereumAddress = string;

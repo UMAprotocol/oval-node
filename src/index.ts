@@ -33,7 +33,7 @@ import {
   isEthCallBundleParams,
   isEthSendBundleParams,
   sendBundle,
-  verifyBundleSignature
+  verifyBundleSignature,
 } from "./lib";
 
 const app = express();
@@ -89,9 +89,19 @@ app.post("/", async (req, res, next) => {
       // accelerates the process by omitting the step of finding unlock addresses and performing simulations.
       if (ovalHeaderConfigs) {
         const ovalAddresses = ovalHeaderConfigs.unlockAddresses.map((unlockAddress) => unlockAddress.ovalAddress);
-        const { unlockBundles } = await getUnlockBundlesFromOvalAddresses(flashbotsBundleProvider, backrunTxs, targetBlock, ovalAddresses, req);
+        const { unlockBundles } = await getUnlockBundlesFromOvalAddresses(
+          flashbotsBundleProvider,
+          backrunTxs,
+          targetBlock,
+          ovalAddresses,
+          req,
+        );
 
-        Logger.debug(req.transactionId, "Header unlock addresses found. Sending unlock tx bundle and backrun bundle...", ovalAddresses);
+        Logger.debug(
+          req.transactionId,
+          "Header unlock addresses found. Sending unlock tx bundle and backrun bundle...",
+          ovalAddresses,
+        );
         // Construct the outer bundle with the modified payload to backrun the UnlockLatestValue call.
         bundle = [
           ...unlockBundles,
@@ -106,7 +116,6 @@ app.post("/", async (req, res, next) => {
 
         return sendBundle(req, res, mevshare, targetBlock, body.id, bundle, refunds);
       } else {
-
         // If configured, simulate the original bundle to check if it reverts without the unlock.
         if (env.passThroughNonReverting) {
           const originalSimulationResponse = await flashbotsBundleProvider.simulate(backrunTxs, targetBlock);
@@ -156,12 +165,11 @@ app.post("/", async (req, res, next) => {
             return { tx, canRevert: false };
           }),
         ];
-        refunds = [{ bodyIdx: 0, percent: adjustedRefundPercent }]
+        refunds = [{ bodyIdx: 0, percent: adjustedRefundPercent }];
       }
 
       // Exit the function here to prevent the request from being forwarded to the FORWARD_URL.
       return sendBundle(req, res, mevshare, targetBlock, body.id, bundle, refunds);
-
     } else if (verifiedSignatureSearcherPkey && body.method == "eth_callBundle") {
       if (!isEthCallBundleParams(body.params)) {
         Logger.info(req.transactionId, "Received unsupported eth_callBundle request!", { body });
@@ -188,9 +196,19 @@ app.post("/", async (req, res, next) => {
       let simulationResponse, unlockTransactionHashes;
       if (ovalHeaderConfigs) {
         const ovalAddresses = ovalHeaderConfigs.unlockAddresses.map((unlockAddress) => unlockAddress.ovalAddress);
-        Logger.debug(req.transactionId, "Header unlock addresses found: simulating unlock tx bundle and backrun bundle...", ovalAddresses);
+        Logger.debug(
+          req.transactionId,
+          "Header unlock addresses found: simulating unlock tx bundle and backrun bundle...",
+          ovalAddresses,
+        );
 
-        const { unlockSignedTransactions, unlockTxHashes } = await getUnlockBundlesFromOvalAddresses(flashbotsBundleProvider, backrunTxs, targetBlock, ovalAddresses, req);
+        const { unlockSignedTransactions, unlockTxHashes } = await getUnlockBundlesFromOvalAddresses(
+          flashbotsBundleProvider,
+          backrunTxs,
+          targetBlock,
+          ovalAddresses,
+          req,
+        );
         simulationResponse = await flashbotsBundleProvider.simulate(
           [...unlockSignedTransactions, ...backrunTxs],
           targetBlock,
@@ -220,7 +238,6 @@ app.post("/", async (req, res, next) => {
 
       // Send back the simulation response without the unlock transaction.
       return handleBundleSimulation(simulationResponse, unlockTransactionHashes, req, res);
-
     } else await handleUnsupportedRequest(req, res, "Invalid signature or method");
   } catch (error) {
     next(error);

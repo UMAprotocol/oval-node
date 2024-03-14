@@ -87,7 +87,11 @@ function handleForwardedRequestErrors(err: unknown, req: Request, res: Response)
 export async function handleUnsupportedRequest(req: Request, res: Response, reason?: string) {
   const { method, body } = req;
 
-  Logger.debug(req.transactionId, `Received unsupported request${reason ? `: ${reason}` : ""}! Forwarding to ${env.forwardUrl} ...`, { body });
+  Logger.debug(
+    req.transactionId,
+    `Received unsupported request${reason ? `: ${reason}` : ""}! Forwarding to ${env.forwardUrl} ...`,
+    { body },
+  );
 
   let response: AxiosResponse;
   try {

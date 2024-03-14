@@ -221,23 +221,30 @@ export function getOvalConfigs(input: string): OvalConfigs {
 }
 
 // Get OvalHeaderConfigs from the header string or throw an error if the header is invalid.
-export const getOvalHeaderConfigs = (header: string | string[] | undefined, ovalConfigs: OvalConfigs): { valid: boolean, ovalHeaderConfigs: OvalHeaderConfigs | undefined } => {
+export const getOvalHeaderConfigs = (
+  header: string | string[] | undefined,
+  ovalConfigs: OvalConfigs,
+): { valid: boolean; ovalHeaderConfigs: OvalHeaderConfigs | undefined } => {
   if (!header) return { valid: true, ovalHeaderConfigs: undefined };
-  if (typeof header !== 'string') return { valid: false, ovalHeaderConfigs: undefined };
+  if (typeof header !== "string") return { valid: false, ovalHeaderConfigs: undefined };
 
   let ovalHeaderConfigs: OvalHeaderConfigs;
   let valid = true;
   try {
     ovalHeaderConfigs = JSON.parse(header);
-    if (!ovalHeaderConfigs.unlockAddresses) throw new Error(`Value "${header}" cannot be converted to OvalConfigs records`);
-    if (!Array.isArray(ovalHeaderConfigs.unlockAddresses)) throw new Error(`Value "${header}" cannot be converted to OvalConfigs records`);
-    if (ovalHeaderConfigs.unlockAddresses.find((ovalHeaderConfig) => !isAddress(ovalHeaderConfig.ovalAddress))) throw new Error(`Value "${header}" cannot be converted to OvalConfigs records`);
-    if (ovalHeaderConfigs.unlockAddresses.find((ovalHeaderConfig) => !ovalConfigs[ovalHeaderConfig.ovalAddress])) throw new Error(`Value "${header}" cannot be converted to OvalConfigs records`);
+    if (!ovalHeaderConfigs.unlockAddresses)
+      throw new Error(`Value "${header}" cannot be converted to OvalConfigs records`);
+    if (!Array.isArray(ovalHeaderConfigs.unlockAddresses))
+      throw new Error(`Value "${header}" cannot be converted to OvalConfigs records`);
+    if (ovalHeaderConfigs.unlockAddresses.find((ovalHeaderConfig) => !isAddress(ovalHeaderConfig.ovalAddress)))
+      throw new Error(`Value "${header}" cannot be converted to OvalConfigs records`);
+    if (ovalHeaderConfigs.unlockAddresses.find((ovalHeaderConfig) => !ovalConfigs[ovalHeaderConfig.ovalAddress]))
+      throw new Error(`Value "${header}" cannot be converted to OvalConfigs records`);
   } catch {
     return { valid: false, ovalHeaderConfigs: undefined };
   }
   return { valid, ovalHeaderConfigs };
-}
+};
 
 // Calculate refunds for the each unlock bundles this assumes the unlock bundles are the first elements in the bundle
 // and the unlockAddresses are in the same order as the unlock bundles.
@@ -248,8 +255,8 @@ export const calculateBundleRefunds = (unlockAddresses: string[], ovalConfigs: O
   // Note: In the future we might want to support different refund percentages for different unlock addresses.
   const split = 100 / unlockAddresses.length;
   for (let i = 0; i < unlockAddresses.length; i++) {
-    const ovalAddress = unlockAddresses[i]
-    const refundToAdd = floorToDecimals(split * ovalConfigs[ovalAddress].refundPercent / 100, 3);
+    const ovalAddress = unlockAddresses[i];
+    const refundToAdd = floorToDecimals((split * ovalConfigs[ovalAddress].refundPercent) / 100, 3);
     const existingRefund = refunds.get(ovalAddress);
     if (existingRefund) {
       // Avoid duplicate refunds for the same Oval instance. We combine them into a single refund.
@@ -259,7 +266,7 @@ export const calculateBundleRefunds = (unlockAddresses: string[], ovalConfigs: O
     }
   }
   return Object.values(refunds);
-}
+};
 
 // Verify the bundle signature header and return the address of the private key that produced the searchers signature if
 // valid, otherwise return null.

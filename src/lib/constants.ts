@@ -46,27 +46,27 @@ export const flashbotsSupportedNetworks: {
     chainId: number;
     streamUrl: string;
     apiUrl: string;
-  }
+  };
 } = {
   mainnet: {
     name: "mainnet",
     chainId: 1,
     streamUrl: "https://mev-share.flashbots.net",
-    apiUrl: "https://relay.flashbots.net"
+    apiUrl: "https://relay.flashbots.net",
   },
   goerli: {
     name: "goerli",
     chainId: 5,
     streamUrl: "https://mev-share-goerli.flashbots.net",
-    apiUrl: "https://relay-goerli.flashbots.net"
+    apiUrl: "https://relay-goerli.flashbots.net",
   },
   sepolia: {
     name: "sepolia",
     chainId: 11155111,
     streamUrl: "https://mev-share-sepolia.flashbots.net",
-    apiUrl: "https://relay-sepolia.flashbots.net"
-  }
-}
+    apiUrl: "https://relay-sepolia.flashbots.net",
+  },
+};
 
 export const FLASHBOTS_SIGNATURE_HEADER = "x-flashbots-signature";
 
