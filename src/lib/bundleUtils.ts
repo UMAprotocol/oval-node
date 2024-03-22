@@ -5,11 +5,14 @@ import { getBaseFee, getMaxBlockByChainId, getProvider, initWallets } from "./he
 
 import MevShareClient, { BundleParams } from "@flashbots/mev-share-client";
 import { JSONRPCID, createJSONRPCSuccessResponse } from "json-rpc-2.0";
+
 import { ovalAbi } from "../abi";
 import { env } from "./env";
 import { Logger } from "./logging";
 import { Refund } from "./types";
 const { ovalConfigs } = env;
+
+export const ovalInterface = Interface.from(ovalAbi);
 
 export const createUnlockLatestValueTx = async (
   wallet: Wallet,
@@ -53,7 +56,6 @@ export const prepareUnlockTransaction = async (
 ) => {
   const provider = getProvider();
   const unlockerWallets = initWallets(provider);
-  const ovalInterface = Interface.from(ovalAbi);
   const [baseFee, network] = await Promise.all([getBaseFee(provider, req), provider.getNetwork()]);
   const data = ovalInterface.encodeFunctionData("unlockLatestValue");
   const { unlockTxHash, signedUnlockTx } = await createUnlockLatestValueTx(

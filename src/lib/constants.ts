@@ -70,4 +70,4 @@ export const flashbotsSupportedNetworks: {
 
 export const FLASHBOTS_SIGNATURE_HEADER = "x-flashbots-signature";
 
-export const OVAL_CONFIG_HEADER = "x-oval-config";
+export const OVAL_ADDRESSES_HEADER = "x-oval-addresses";

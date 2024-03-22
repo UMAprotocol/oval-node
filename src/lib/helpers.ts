@@ -1,12 +1,22 @@
 import MevShareClient from "@flashbots/mev-share-client";
-import { JsonRpcProvider, Network, Provider, Transaction, Wallet, ethers, isAddress, isHexString } from "ethers";
+import {
+  JsonRpcProvider,
+  Network,
+  Provider,
+  Transaction,
+  Wallet,
+  ethers,
+  getAddress,
+  isAddress,
+  isHexString,
+} from "ethers";
 import { Request } from "express";
 import { FlashbotsBundleProvider } from "flashbots-ethers-v6-provider-bundle";
 import { JSONRPCRequest } from "json-rpc-2.0";
 import { chainIdBlockOffsets, flashbotsSupportedNetworks, supportedNetworks } from "./constants";
 import { env } from "./env";
 import { Logger } from "./logging";
-import { OvalConfig, OvalConfigs, OvalHeaderConfigs, Refund } from "./types";
+import { OvalAddressConfigList, OvalConfig, OvalConfigs } from "./types";
 
 export function getProvider() {
   const network = new Network(supportedNetworks[env.chainId], env.chainId);
@@ -204,6 +214,18 @@ function isOvalConfigs(input: unknown): input is OvalConfigs {
   );
 }
 
+const normaliseOvalConfigs = (config: OvalConfigs): OvalConfigs => {
+  const normalised: OvalConfigs = {};
+  for (const [address, ovalConfig] of Object.entries(config)) {
+    normalised[getAddress(address)] = {
+      unlockerKey: ovalConfig.unlockerKey,
+      refundAddress: getAddress(ovalConfig.refundAddress),
+      refundPercent: ovalConfig.refundPercent,
+    };
+  }
+  return normalised;
+};
+
 export function getOvalConfigs(input: string): OvalConfigs {
   let parsedInput: unknown;
 
@@ -214,57 +236,42 @@ export function getOvalConfigs(input: string): OvalConfigs {
   }
 
   if (isOvalConfigs(parsedInput)) {
-    return parsedInput;
+    return normaliseOvalConfigs(parsedInput);
   }
 
   throw new Error(`Value "${input}" is valid JSON but is not OvalConfigs records`);
 }
 
-// Get OvalHeaderConfigs from the header string or throw an error if the header is invalid.
+// Get OvalAddressConfigList from the header string or throw an error if the header is invalid.
 export const getOvalHeaderConfigs = (
   header: string | string[] | undefined,
   ovalConfigs: OvalConfigs,
-): { valid: boolean; ovalHeaderConfigs: OvalHeaderConfigs | undefined } => {
-  if (!header) return { valid: true, ovalHeaderConfigs: undefined };
-  if (typeof header !== "string") return { valid: false, ovalHeaderConfigs: undefined };
-
-  let ovalHeaderConfigs: OvalHeaderConfigs;
-  let valid = true;
+): { errorMessage?: string; ovalAddresses: OvalAddressConfigList | undefined } => {
+  if (!header) return { ovalAddresses: undefined };
+  if (typeof header !== "string") return { ovalAddresses: undefined };
   try {
-    ovalHeaderConfigs = JSON.parse(header);
-    if (!ovalHeaderConfigs.unlockAddresses)
-      throw new Error(`Value "${header}" cannot be converted to OvalConfigs records`);
-    if (!Array.isArray(ovalHeaderConfigs.unlockAddresses))
-      throw new Error(`Value "${header}" cannot be converted to OvalConfigs records`);
-    if (ovalHeaderConfigs.unlockAddresses.find((ovalHeaderConfig) => !isAddress(ovalHeaderConfig.ovalAddress)))
-      throw new Error(`Value "${header}" cannot be converted to OvalConfigs records`);
-    if (ovalHeaderConfigs.unlockAddresses.find((ovalHeaderConfig) => !ovalConfigs[ovalHeaderConfig.ovalAddress]))
-      throw new Error(`Value "${header}" cannot be converted to OvalConfigs records`);
-  } catch {
-    return { valid: false, ovalHeaderConfigs: undefined };
-  }
-  return { valid, ovalHeaderConfigs };
-};
-
-// Calculate refunds for the each unlock bundles this assumes the unlock bundles are the first elements in the bundle
-// and the unlockAddresses are in the same order as the unlock bundles.
-export const calculateBundleRefunds = (unlockAddresses: string[], ovalConfigs: OvalConfigs): Refund[] => {
-  const refunds = new Map<string, Refund>();
-  // We split the refund percentage equally between the unlock addresses and for each we calculate the refund according
-  // Oval instance refund percentage in OvalConfigs.
-  const split = 100 / unlockAddresses.length;
-  for (let i = 0; i < unlockAddresses.length; i++) {
-    const ovalAddress = unlockAddresses[i];
-    const refundToAdd = floorToDecimals((split * ovalConfigs[ovalAddress].refundPercent) / 100, 3);
-    const existingRefund = refunds.get(ovalAddress);
-    if (existingRefund) {
-      // Avoid duplicate refunds for the same Oval instance. We combine them into a single refund.
-      refunds.set(ovalAddress, { bodyIdx: existingRefund.bodyIdx, percent: existingRefund.percent + refundToAdd });
-    } else {
-      refunds.set(ovalAddress, { bodyIdx: i, percent: refundToAdd });
+    const ovalAddresses: OvalAddressConfigList = JSON.parse(header);
+    if (!Array.isArray(ovalAddresses) || !ovalAddresses.every(isAddress)) {
+      throw new Error(`Value "${header}" is not a valid array of Ethereum addresses`);
     }
+    if (ovalAddresses.some((ovalAddress) => !ovalConfigs[ovalAddress])) {
+      throw new Error(`Some addresses in "${header}" are not valid Oval instances`);
+    }
+    const uniqueRefundAddresses = new Set(ovalAddresses.map((address) => ovalConfigs[address].refundAddress));
+    if (uniqueRefundAddresses.size > 1) {
+      throw new Error(`Value "${header}" only supports a single refund address`);
+    }
+    const uniqueAddresses = new Set(ovalAddresses);
+    if (uniqueAddresses.size !== ovalAddresses.length) {
+      throw new Error(`Value "${header}" contains duplicate addresses`);
+    }
+    if (ovalAddresses.length > env.maxOvalHeaderAddresses) {
+      throw new Error(`Value "${header}" contains more than ${env.maxOvalHeaderAddresses} addresses`);
+    }
+    return { ovalAddresses: ovalAddresses.map(getAddress) }; // Normalise addresses.
+  } catch (error) {
+    return { ovalAddresses: undefined, errorMessage: (error as Error).message };
   }
-  return Object.values(refunds);
 };
 
 // Verify the bundle signature header and return the address of the private key that produced the searchers signature if
@@ -305,10 +312,4 @@ export function getPrivateKey(input: string): string {
 export function getMaxBlockByChainId(chainId: number, targetBlock: number) {
   // In mainnet this is always the targetBlock, but in Goerli we add 24 blocks to the targetBlock.
   return targetBlock + chainIdBlockOffsets[chainId];
-}
-
-// Helper function to floor a number to a given number of decimals.
-export function floorToDecimals(value: number, decimals: number): number {
-  const factor = Math.pow(10, decimals);
-  return Math.floor(value * factor) / factor;
 }

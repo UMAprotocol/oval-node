@@ -19,10 +19,9 @@ import {
 import {
   FLASHBOTS_SIGNATURE_HEADER,
   Logger,
-  OVAL_CONFIG_HEADER,
+  OVAL_ADDRESSES_HEADER,
   Refund,
   adjustRefundPercent,
-  calculateBundleRefunds,
   createUnlockLatestValueBundle,
   env,
   findUnlock,
@@ -62,9 +61,12 @@ app.post("/", async (req, res, next) => {
     const verifiedSignatureSearcherPkey = verifyBundleSignature(body, req.headers[FLASHBOTS_SIGNATURE_HEADER], req);
 
     // Get Oval header configs if present.
-    const { valid, ovalHeaderConfigs } = getOvalHeaderConfigs(req.headers[OVAL_CONFIG_HEADER], ovalConfigs);
-    if (!valid) {
-      await handleUnsupportedRequest(req, res, "Error parsing Oval header configs");
+    const { ovalAddresses: headerOvalAddresses, errorMessage } = getOvalHeaderConfigs(
+      req.headers[OVAL_ADDRESSES_HEADER],
+      ovalConfigs,
+    );
+    if (errorMessage) {
+      await handleUnsupportedRequest(req, res, "Error parsing Oval header configs: " + errorMessage);
       return;
     }
 
@@ -84,23 +86,22 @@ app.post("/", async (req, res, next) => {
       const { mevshare, flashbotsBundleProvider } = await initClients(provider, verifiedSignatureSearcherPkey);
 
       let bundle: BundleParams["body"], refunds: Refund[];
-      // If ovalHeaderConfigs.unlockAddresses are configured, send the unlock transaction bundles and the backrun bundle without simulation.
+      // If headerOvalAddresses are configured, send the unlock transaction bundles and the backrun bundle without simulation.
       // This setting enables the searcher to request a specific list of unlock addresses for use in their bundle and
       // accelerates the process by omitting the step of finding unlock addresses and performing simulations.
-      if (ovalHeaderConfigs) {
-        const ovalAddresses = ovalHeaderConfigs.unlockAddresses.map((unlockAddress) => unlockAddress.ovalAddress);
+      if (headerOvalAddresses) {
         const { unlockBundles } = await getUnlockBundlesFromOvalAddresses(
           flashbotsBundleProvider,
           backrunTxs,
           targetBlock,
-          ovalAddresses,
+          headerOvalAddresses,
           req,
         );
 
         Logger.debug(
           req.transactionId,
-          "Header unlock addresses found. Sending unlock tx bundle and backrun bundle...",
-          ovalAddresses,
+          "Header oval addresses found. Sending unlock tx bundle and backrun bundle...",
+          headerOvalAddresses,
         );
         // Construct the outer bundle with the modified payload to backrun the UnlockLatestValue call.
         bundle = [
@@ -110,9 +111,14 @@ app.post("/", async (req, res, next) => {
           }),
         ];
 
-        // Calculate refunds for the each unlock bundles this assumes the unlock bundles are the first elements in the bundle
-        // and the ovalAddresses are in the same order as the unlock bundles.
-        refunds = calculateBundleRefunds(ovalAddresses, ovalConfigs);
+        // A single refund address is required for bundles using header unlocks, with 100% of the refund directed to the
+        // first unlock's address, ensuring consistency.
+        refunds = [
+          {
+            bodyIdx: 0,
+            percent: 100,
+          },
+        ];
 
         return sendBundle(req, res, mevshare, targetBlock, body.id, bundle, refunds);
       } else {
@@ -194,19 +200,18 @@ app.post("/", async (req, res, next) => {
       }
 
       let simulationResponse, unlockTransactionHashes;
-      if (ovalHeaderConfigs) {
-        const ovalAddresses = ovalHeaderConfigs.unlockAddresses.map((unlockAddress) => unlockAddress.ovalAddress);
+      if (headerOvalAddresses) {
         Logger.debug(
           req.transactionId,
           "Header unlock addresses found: simulating unlock tx bundle and backrun bundle...",
-          ovalAddresses,
+          headerOvalAddresses,
         );
 
         const { unlockSignedTransactions, unlockTxHashes } = await getUnlockBundlesFromOvalAddresses(
           flashbotsBundleProvider,
           backrunTxs,
           targetBlock,
-          ovalAddresses,
+          headerOvalAddresses,
           req,
         );
         simulationResponse = await flashbotsBundleProvider.simulate(

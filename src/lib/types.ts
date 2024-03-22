@@ -12,19 +12,10 @@ export type Refund = {
   percent: number;
 };
 
-export interface OvalHeaderConfigs {
-  unlockAddresses: {
-    ovalAddress: string;
-  }[];
-}
-
 type EthereumAddress = string;
 
 export interface UnlockAddress {
   ovalAddress: EthereumAddress;
 }
 
-export interface OvalHeaderConfigs {
-  unlockAddresses: UnlockAddress[];
-  additionalData?: Record<string, any>; // Placeholder for future expansion, not used at the moment.
-}
+export type OvalAddressConfigList = string[];
