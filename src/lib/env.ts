@@ -1,7 +1,7 @@
-import { getAddress, parseEther } from "ethers";
 import dotenv from "dotenv";
+import { getAddress, parseEther } from "ethers";
 import { fallback, supportedNetworks } from "./constants";
-import { getBoolean, getInt, getFloat, getStringArray, getOvalConfigs, getPrivateKey } from "./helpers";
+import { getBoolean, getFloat, getInt, getOvalConfigs, getPrivateKey, getStringArray } from "./helpers";
 import { OvalConfigs } from "./types";
 dotenv.config({ path: ".env" });
 
@@ -44,5 +44,6 @@ export const env = {
   passThroughNonReverting: getBoolean(
     getEnvVar("PASS_THROUGH_NON_REVERTING", fallback.passThroughNonReverting.toString()),
   ),
+  maxOvalHeaderAddresses: getInt(getEnvVar("MAX_OVAL_HEADER_ADDRESSES", "5")),
   flashbotsOrigin: process.env["FLASHBOTS_ORIGIN"],
 };
