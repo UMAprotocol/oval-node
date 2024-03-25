@@ -254,21 +254,23 @@ export const getOvalHeaderConfigs = (
     if (!Array.isArray(ovalAddresses) || !ovalAddresses.every(isAddress)) {
       throw new Error(`Value "${header}" is not a valid array of Ethereum addresses`);
     }
-    if (ovalAddresses.some((ovalAddress) => !ovalConfigs[ovalAddress])) {
+    // Normalise addresses and check if they are valid Oval instances.
+    const normalisedAddresses = ovalAddresses.map(getAddress);
+    if (normalisedAddresses.some((ovalAddress) => !ovalConfigs[ovalAddress])) {
       throw new Error(`Some addresses in "${header}" are not valid Oval instances`);
     }
-    const uniqueRefundAddresses = new Set(ovalAddresses.map((address) => ovalConfigs[address].refundAddress));
+    const uniqueRefundAddresses = new Set(normalisedAddresses.map((address) => ovalConfigs[address].refundAddress));
     if (uniqueRefundAddresses.size > 1) {
       throw new Error(`Value "${header}" only supports a single refund address`);
     }
-    const uniqueAddresses = new Set(ovalAddresses);
-    if (uniqueAddresses.size !== ovalAddresses.length) {
+    const uniqueAddresses = new Set(normalisedAddresses);
+    if (uniqueAddresses.size !== normalisedAddresses.length) {
       throw new Error(`Value "${header}" contains duplicate addresses`);
     }
-    if (ovalAddresses.length > env.maxOvalHeaderAddresses) {
+    if (normalisedAddresses.length > env.maxOvalHeaderAddresses) {
       throw new Error(`Value "${header}" contains more than ${env.maxOvalHeaderAddresses} addresses`);
     }
-    return { ovalAddresses: ovalAddresses.map(getAddress) }; // Normalise addresses.
+    return { ovalAddresses: normalisedAddresses };
   } catch (error) {
     return { ovalAddresses: undefined, errorMessage: (error as Error).message };
   }
