@@ -1,12 +1,22 @@
-import { JsonRpcProvider, Network, Wallet, Provider, isAddress, isHexString, Transaction, ethers } from "ethers";
-import MevShareClient, { SupportedNetworks } from "@flashbots/mev-share-client";
+import MevShareClient from "@flashbots/mev-share-client";
+import {
+  JsonRpcProvider,
+  Network,
+  Provider,
+  Transaction,
+  Wallet,
+  ethers,
+  getAddress,
+  isAddress,
+  isHexString,
+} from "ethers";
+import { Request } from "express";
 import { FlashbotsBundleProvider } from "flashbots-ethers-v6-provider-bundle";
+import { JSONRPCRequest } from "json-rpc-2.0";
+import { chainIdBlockOffsets, flashbotsSupportedNetworks, supportedNetworks } from "./constants";
 import { env } from "./env";
 import { Logger } from "./logging";
-import { OvalConfig, OvalConfigs } from "./types";
-import { JSONRPCRequest } from "json-rpc-2.0";
-import { Request } from "express";
-import { chainIdBlockOffsets, flashbotsSupportedNetworks, supportedNetworks } from "./constants";
+import { OvalAddressConfigList, OvalConfig, OvalConfigs } from "./types";
 
 export function getProvider() {
   const network = new Network(supportedNetworks[env.chainId], env.chainId);
@@ -204,6 +214,18 @@ function isOvalConfigs(input: unknown): input is OvalConfigs {
   );
 }
 
+const normaliseOvalConfigs = (config: OvalConfigs): OvalConfigs => {
+  const normalised: OvalConfigs = {};
+  for (const [address, ovalConfig] of Object.entries(config)) {
+    normalised[getAddress(address)] = {
+      unlockerKey: ovalConfig.unlockerKey,
+      refundAddress: getAddress(ovalConfig.refundAddress),
+      refundPercent: ovalConfig.refundPercent,
+    };
+  }
+  return normalised;
+};
+
 export function getOvalConfigs(input: string): OvalConfigs {
   let parsedInput: unknown;
 
@@ -214,11 +236,45 @@ export function getOvalConfigs(input: string): OvalConfigs {
   }
 
   if (isOvalConfigs(parsedInput)) {
-    return parsedInput;
+    return normaliseOvalConfigs(parsedInput);
   }
 
   throw new Error(`Value "${input}" is valid JSON but is not OvalConfigs records`);
 }
+
+// Get OvalAddressConfigList from the header string or throw an error if the header is invalid.
+export const getOvalHeaderConfigs = (
+  header: string | string[] | undefined,
+  ovalConfigs: OvalConfigs,
+): { errorMessage?: string; ovalAddresses: OvalAddressConfigList | undefined } => {
+  if (!header) return { ovalAddresses: undefined };
+  if (typeof header !== "string") return { ovalAddresses: undefined };
+  try {
+    const ovalAddresses: OvalAddressConfigList = JSON.parse(header);
+    if (!Array.isArray(ovalAddresses) || !ovalAddresses.every(isAddress)) {
+      throw new Error(`Value "${header}" is not a valid array of Ethereum addresses`);
+    }
+    // Normalise addresses and check if they are valid Oval instances.
+    const normalisedAddresses = ovalAddresses.map(getAddress);
+    if (normalisedAddresses.some((ovalAddress) => !ovalConfigs[ovalAddress])) {
+      throw new Error(`Some addresses in "${header}" are not valid Oval instances`);
+    }
+    const uniqueRefundAddresses = new Set(normalisedAddresses.map((address) => ovalConfigs[address].refundAddress));
+    if (uniqueRefundAddresses.size > 1) {
+      throw new Error(`Value "${header}" only supports a single refund address`);
+    }
+    const uniqueAddresses = new Set(normalisedAddresses);
+    if (uniqueAddresses.size !== normalisedAddresses.length) {
+      throw new Error(`Value "${header}" contains duplicate addresses`);
+    }
+    if (normalisedAddresses.length > env.maxOvalHeaderAddresses) {
+      throw new Error(`Value "${header}" contains more than ${env.maxOvalHeaderAddresses} addresses`);
+    }
+    return { ovalAddresses: normalisedAddresses };
+  } catch (error) {
+    return { ovalAddresses: undefined, errorMessage: (error as Error).message };
+  }
+};
 
 // Verify the bundle signature header and return the address of the private key that produced the searchers signature if
 // valid, otherwise return null.
