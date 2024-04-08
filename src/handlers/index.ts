@@ -1,9 +1,9 @@
 import axios, { AxiosError, AxiosResponse } from "axios";
-import { Request, Response, NextFunction } from "express";
-import { keccak256, concat } from "ethers";
+import { concat, keccak256 } from "ethers";
+import { NextFunction, Request, Response } from "express";
 import { SimulationResponse, SimulationResponseSuccess } from "flashbots-ethers-v6-provider-bundle";
-import { createJSONRPCErrorResponse, createJSONRPCSuccessResponse, JSONRPCErrorException } from "json-rpc-2.0";
-import { env, Logger, stringifyBigInts } from "../lib";
+import { JSONRPCErrorException, createJSONRPCErrorResponse, createJSONRPCSuccessResponse } from "json-rpc-2.0";
+import { Logger, env, stringifyBigInts } from "../lib";
 
 // Error handler that logs error and sends JSON-RPC error response.
 export function expressErrorHandler(err: Error, req: Request, res: Response, next: NextFunction) {
@@ -22,9 +22,9 @@ export function expressErrorHandler(err: Error, req: Request, res: Response, nex
 // Logic based on CallBundle function implementation in https://github.com/flashbots/builder/blob/main/internal/ethapi/api.go
 function removeUnlockFromSimulationResult(
   simulationResponse: SimulationResponseSuccess,
-  unlockTxHash: string,
+  unlockTxHashes: string[],
 ): SimulationResponseSuccess {
-  const results = simulationResponse.results.filter((txResponse) => txResponse.txHash !== unlockTxHash);
+  const results = simulationResponse.results.filter((txResponse) => !unlockTxHashes.includes(txResponse.txHash));
   const coinbaseDiff = results.reduce((total, txResponse) => total + BigInt(txResponse.coinbaseDiff), 0n);
   const gasFees = results.reduce((total, txResponse) => total + BigInt(txResponse.gasFees), 0n);
   const totalGasUsed = results.reduce((total, txResponse) => total + txResponse.gasUsed, 0);
@@ -44,13 +44,17 @@ function removeUnlockFromSimulationResult(
 // Bundle simulation handler that sends simulation response to the client without the unlock transaction.
 export function handleBundleSimulation(
   simulationResponse: SimulationResponse,
-  unlockTxHash: string,
+  unlockTxHashes: string[],
   req: Request,
   res: Response,
 ) {
   if ("error" in simulationResponse) {
     Logger.debug(req.transactionId, "Simulation error", { simulationResponse });
-    if (simulationResponse.error.message.includes(unlockTxHash)) {
+
+    // Check if any of the unlockTxHashes is included in the error message
+    const isUnlockTxHashError = unlockTxHashes.some((hash) => simulationResponse.error.message.includes(hash));
+
+    if (isUnlockTxHashError) {
       // Mark as internal error if the prepended unlock tx was at fault.
       res.status(200).send(createJSONRPCErrorResponse(req.body.id, -32603, "Internal error"));
     } else {
@@ -61,7 +65,7 @@ export function handleBundleSimulation(
     }
     return;
   } else {
-    const clientSimulationResult = removeUnlockFromSimulationResult(simulationResponse, unlockTxHash);
+    const clientSimulationResult = removeUnlockFromSimulationResult(simulationResponse, unlockTxHashes);
     res.status(200).send(createJSONRPCSuccessResponse(req.body.id, stringifyBigInts(clientSimulationResult)));
   }
 }
@@ -83,7 +87,11 @@ function handleForwardedRequestErrors(err: unknown, req: Request, res: Response)
 export async function handleUnsupportedRequest(req: Request, res: Response, reason?: string) {
   const { method, body } = req;
 
-  Logger.debug(req.transactionId, `Received unsupported request${reason ? `: ${reason}` : ""}! Forwarding to ${env.forwardUrl} ...`, { body });
+  Logger.debug(
+    req.transactionId,
+    `Received unsupported request${reason ? `: ${reason}` : ""}! Forwarding to ${env.forwardUrl} ...`,
+    { body },
+  );
 
   let response: AxiosResponse;
   try {
