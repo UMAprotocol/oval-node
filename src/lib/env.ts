@@ -64,7 +64,7 @@ export const env: EnvironmentVariables = {
   maxOvalHeaderAddresses: getInt(getEnvVar("MAX_OVAL_HEADER_ADDRESSES", "5")),
   flashbotsOrigin: process.env["FLASHBOTS_ORIGIN"],
   chainIdBlockOffsets: {
-    [MAINNET_CHAIN_ID]: getInt(getEnvVar("MAINNET_INCLUSION_BLOCK_OFFSET", "2")),
-    [SEPOLIA_CHAIN_ID]: getInt(getEnvVar("SEPOLIA_INCLUSION_BLOCK_OFFSET", "24")),
+    [MAINNET_CHAIN_ID]: getInt(getEnvVar("MAINNET_BLOCK_OFFSET", "2")),
+    [SEPOLIA_CHAIN_ID]: getInt(getEnvVar("SEPOLIA_BLOCK_OFFSET", "24")),
   },
 };
