@@ -32,14 +32,6 @@ export const supportedNetworks: {
   [SEPOLIA_CHAIN_ID]: "sepolia",
 };
 
-export const chainIdBlockOffsets: {
-  [key: number]: number;
-} = {
-  [MAINNET_CHAIN_ID]: 0,
-  [GOERLI_CHAIN_ID]: 24,
-  [SEPOLIA_CHAIN_ID]: 24,
-};
-
 export const flashbotsSupportedNetworks: {
   [key in SupportedNetworks]: {
     name: string;
