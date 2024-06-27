@@ -111,12 +111,11 @@ app.post("/", async (req, res, next) => {
           }),
         ];
 
-        // A single refund address is required for bundles using header unlocks, with 100% of the refund directed to the
-        // first unlock's address, ensuring consistency.
+        // A single refund address is required for bundles using header unlocks.
         refunds = [
           {
             bodyIdx: 0,
-            percent: 100,
+            percent: ovalConfigs[headerOvalAddresses[0]].refundPercent, // This requires a single refund address. see getOvalHeaderConfigs
           },
         ];
 
