@@ -1,6 +1,6 @@
 import dotenv from "dotenv";
 import { getAddress, parseEther } from "ethers";
-import { MAINNET_CHAIN_ID, SEPOLIA_CHAIN_ID, fallback, supportedNetworks } from "./constants";
+import { fallback, supportedNetworks } from "./constants";
 import { getBoolean, getFloat, getInt, getOvalConfigs, getPrivateKey, getStringArray } from "./helpers";
 import { OvalConfigs } from "./types";
 dotenv.config({ path: ".env" });
@@ -32,24 +32,7 @@ if (!supportedNetworks[chainId]) {
   throw new Error(`Unsupported chainId: ${chainId}`);
 }
 
-type EnvironmentVariables = {
-  port: number;
-  authKey: string;
-  chainId: number;
-  providerUrl: string;
-  ovalConfigs: OvalConfigs;
-  forwardUrl: string;
-  builders: string[];
-  minNetBuilderPaymentWei: bigint;
-  passThroughNonReverting: boolean;
-  maxOvalHeaderAddresses: number;
-  flashbotsOrigin: string | undefined;
-  chainIdBlockOffsets: {
-    [key: number]: number;
-  };
-};
-
-export const env: EnvironmentVariables = {
+export const env = {
   port: getInt(getEnvVar("PORT", fallback.port.toString())),
   authKey: getPrivateKey(getEnvVar("AUTH_PRIVATE_KEY")),
   chainId,
@@ -63,8 +46,4 @@ export const env: EnvironmentVariables = {
   ),
   maxOvalHeaderAddresses: getInt(getEnvVar("MAX_OVAL_HEADER_ADDRESSES", "5")),
   flashbotsOrigin: process.env["FLASHBOTS_ORIGIN"],
-  chainIdBlockOffsets: {
-    [MAINNET_CHAIN_ID]: getInt(getEnvVar("MAINNET_BLOCK_OFFSET", "2")),
-    [SEPOLIA_CHAIN_ID]: getInt(getEnvVar("SEPOLIA_BLOCK_OFFSET", "24")),
-  },
 };

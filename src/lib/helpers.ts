@@ -13,7 +13,7 @@ import {
 import { Request } from "express";
 import { FlashbotsBundleProvider } from "flashbots-ethers-v6-provider-bundle";
 import { JSONRPCRequest } from "json-rpc-2.0";
-import { flashbotsSupportedNetworks, supportedNetworks } from "./constants";
+import { chainIdBlockOffsets, flashbotsSupportedNetworks, supportedNetworks } from "./constants";
 import { env } from "./env";
 import { Logger } from "./logging";
 import { OvalAddressConfigList, OvalConfig, OvalConfigs } from "./types";
@@ -313,5 +313,5 @@ export function getPrivateKey(input: string): string {
 // Calculate the maximum block number to target with bundles by chainId.
 export function getMaxBlockByChainId(chainId: number, targetBlock: number) {
   // In mainnet this is always the targetBlock, but in Goerli we add 24 blocks to the targetBlock.
-  return targetBlock + env.chainIdBlockOffsets[chainId];
+  return targetBlock + chainIdBlockOffsets[chainId];
 }
