@@ -20,6 +20,7 @@ import {
   FLASHBOTS_SIGNATURE_HEADER,
   Logger,
   OVAL_ADDRESSES_HEADER,
+  PrivateKeyManager,
   Refund,
   adjustRefundPercent,
   createUnlockLatestValueBundle,
@@ -46,83 +47,155 @@ app.use((req, res, next) => {
 const provider = getProvider();
 const { ovalConfigs } = env;
 
-// Start restful API server to listen for root inbound post requests.
-app.post("/", async (req, res, next) => {
-  try {
-    const { url, method, body } = req;
-    Logger.debug(req.transactionId, `Received: ${method} ${url}`, { body });
+(async () => {
+  const keyManager = PrivateKeyManager.getInstance();
+  await keyManager.initialize(ovalConfigs);
 
-    if (!isJSONRPCRequest(body) || !isJSONRPCID(body.id)) {
-      await handleUnsupportedRequest(req, res, "Invalid JSON RPC request");
-      return;
-    }
+  // Start restful API server to listen for root inbound post requests.
+  app.post("/", async (req, res, next) => {
+    try {
+      const { url, method, body } = req;
+      Logger.debug(req.transactionId, `Received: ${method} ${url}`, { body });
 
-    // Verify that the signature in the request headers matches the bundle payload.
-    const verifiedSignatureSearcherPkey = verifyBundleSignature(body, req.headers[FLASHBOTS_SIGNATURE_HEADER], req);
-
-    // Get Oval header configs if present.
-    const { ovalAddresses: headerOvalAddresses, errorMessage } = getOvalHeaderConfigs(
-      req.headers[OVAL_ADDRESSES_HEADER],
-      ovalConfigs,
-    );
-    if (errorMessage) {
-      await handleUnsupportedRequest(req, res, "Error parsing Oval header configs: " + errorMessage);
-      return;
-    }
-
-    // Prepend the unlock transaction if the request is a valid JSON RPC 2.0 'eth_sendBundle' method with a valid bundle signature.
-    if (verifiedSignatureSearcherPkey && body.method == "eth_sendBundle") {
-      if (!isEthSendBundleParams(body.params)) {
-        Logger.debug(req.transactionId, "Received unsupported eth_sendBundle request!", { body });
-        res.status(200).send(createJSONRPCErrorResponse(body.id, -32000, "Unsupported eth_sendBundle params"));
+      if (!isJSONRPCRequest(body) || !isJSONRPCID(body.id)) {
+        await handleUnsupportedRequest(req, res, "Invalid JSON RPC request");
         return;
       }
 
-      Logger.debug(req.transactionId, "Received eth_sendBundle request!", { body });
+      // Verify that the signature in the request headers matches the bundle payload.
+      const verifiedSignatureSearcherPkey = verifyBundleSignature(body, req.headers[FLASHBOTS_SIGNATURE_HEADER], req);
 
-      const backrunTxs = body.params[0].txs;
-      const targetBlock = parseInt(Number(body.params[0].blockNumber).toString());
+      // Get Oval header configs if present.
+      const { ovalAddresses: headerOvalAddresses, errorMessage } = getOvalHeaderConfigs(
+        req.headers[OVAL_ADDRESSES_HEADER],
+        ovalConfigs,
+      );
+      if (errorMessage) {
+        await handleUnsupportedRequest(req, res, "Error parsing Oval header configs: " + errorMessage);
+        return;
+      }
 
-      const { mevshare, flashbotsBundleProvider } = await initClients(provider, verifiedSignatureSearcherPkey);
+      // Prepend the unlock transaction if the request is a valid JSON RPC 2.0 'eth_sendBundle' method with a valid bundle signature.
+      if (verifiedSignatureSearcherPkey && body.method == "eth_sendBundle") {
+        if (!isEthSendBundleParams(body.params)) {
+          Logger.debug(req.transactionId, "Received unsupported eth_sendBundle request!", { body });
+          res.status(200).send(createJSONRPCErrorResponse(body.id, -32000, "Unsupported eth_sendBundle params"));
+          return;
+        }
 
-      let bundle: BundleParams["body"], refunds: Refund[];
-      // If headerOvalAddresses are configured, send the unlock transaction bundles and the backrun bundle without simulation.
-      // This setting enables the searcher to request a specific list of unlock addresses for use in their bundle and
-      // accelerates the process by omitting the step of finding unlock addresses and performing simulations.
-      if (headerOvalAddresses) {
-        const { unlockBundles } = await getUnlockBundlesFromOvalAddresses(
-          flashbotsBundleProvider,
-          backrunTxs,
-          targetBlock,
-          headerOvalAddresses,
-          req,
-        );
+        Logger.debug(req.transactionId, "Received eth_sendBundle request!", { body });
 
-        Logger.debug(
-          req.transactionId,
-          "Header oval addresses found. Sending unlock tx bundle and backrun bundle...",
-          headerOvalAddresses,
-        );
-        // Construct the outer bundle with the modified payload to backrun the UnlockLatestValue call.
-        bundle = [
-          ...unlockBundles,
-          ...backrunTxs.map((tx): { tx: string; canRevert: boolean } => {
-            return { tx, canRevert: false };
-          }),
-        ];
+        const backrunTxs = body.params[0].txs;
+        const targetBlock = parseInt(Number(body.params[0].blockNumber).toString());
 
-        // A single refund address across all the bundles is required for bundles using header unlocks.
-        // This is enforced in getOvalHeaderConfigs
-        refunds = [
-          {
-            bodyIdx: 0,
-            // Next line is dependent on all Oval addresses having the same refund address
-            percent: ovalConfigs[headerOvalAddresses[0]].refundPercent,
-          },
-        ];
+        const { mevshare, flashbotsBundleProvider } = await initClients(provider, verifiedSignatureSearcherPkey);
 
+        let bundle: BundleParams["body"], refunds: Refund[];
+        // If headerOvalAddresses are configured, send the unlock transaction bundles and the backrun bundle without simulation.
+        // This setting enables the searcher to request a specific list of unlock addresses for use in their bundle and
+        // accelerates the process by omitting the step of finding unlock addresses and performing simulations.
+        if (headerOvalAddresses) {
+          const { unlockBundles } = await getUnlockBundlesFromOvalAddresses(
+            flashbotsBundleProvider,
+            backrunTxs,
+            targetBlock,
+            headerOvalAddresses,
+            req,
+          );
+
+          Logger.debug(
+            req.transactionId,
+            "Header oval addresses found. Sending unlock tx bundle and backrun bundle...",
+            headerOvalAddresses,
+          );
+          // Construct the outer bundle with the modified payload to backrun the UnlockLatestValue call.
+          bundle = [
+            ...unlockBundles,
+            ...backrunTxs.map((tx): { tx: string; canRevert: boolean } => {
+              return { tx, canRevert: false };
+            }),
+          ];
+
+          // A single refund address across all the bundles is required for bundles using header unlocks.
+          // This is enforced in getOvalHeaderConfigs
+          refunds = [
+            {
+              bodyIdx: 0,
+              // Next line is dependent on all Oval addresses having the same refund address
+              percent: ovalConfigs[headerOvalAddresses[0]].refundPercent,
+            },
+          ];
+
+          return sendBundle(req, res, mevshare, targetBlock, body.id, bundle, refunds);
+        } else {
+          // If configured, simulate the original bundle to check if it reverts without the unlock.
+          if (env.passThroughNonReverting) {
+            const originalSimulationResponse = await flashbotsBundleProvider.simulate(backrunTxs, targetBlock);
+            if (!originalBundleReverts(originalSimulationResponse, req)) {
+              await handleUnsupportedRequest(req, res, "Original bundle does not revert"); // Pass through if the original bundle doesn't revert.
+              return;
+            }
+          }
+
+          Logger.debug(req.transactionId, "Finding unlock that does not revert the bundle...");
+
+          const unlock = await findUnlock(flashbotsBundleProvider, backrunTxs, targetBlock, req);
+          if (!unlock) {
+            Logger.debug(req.transactionId, "No valid unlock found!");
+            await handleUnsupportedRequest(req, res, "No valid unlock found"); // Pass through if no unlock is found.
+            return;
+          }
+          // Dynamically adjust refund percent so that builder nets at least configured minimum. We don't need to consider
+          // refund gas costs as the builder is deducting them from refund and should not include the bundle if refund gas
+          // costs exceed refund value.
+          const adjustedRefundPercent = adjustRefundPercent(
+            unlock.simulationResponse.coinbaseDiff,
+            ovalConfigs[unlock.ovalAddress].refundPercent,
+          );
+          if (adjustedRefundPercent <= 0) {
+            Logger.debug(req.transactionId, `Insufficient builder payment ${unlock.simulationResponse.coinbaseDiff}`);
+            await handleUnsupportedRequest(req, res, "Insufficient builder payment"); // Pass through as minimum payment not met.
+            return;
+          }
+
+          Logger.debug(
+            req.transactionId,
+            `Found valid unlock at ${unlock.ovalAddress}. Sending unlock tx bundle and backrun bundle...`,
+          );
+
+          // Construct the inner bundle with call to Oval to unlock the latest value.
+          const unlockBundle = createUnlockLatestValueBundle(
+            unlock.signedUnlockTx,
+            ovalConfigs[unlock.ovalAddress].refundAddress,
+            targetBlock,
+          );
+
+          // Construct the outer bundle with the modified payload to backrun the UnlockLatestValue call.
+          bundle = [
+            { bundle: unlockBundle },
+            ...backrunTxs.map((tx): { tx: string; canRevert: boolean } => {
+              return { tx, canRevert: false };
+            }),
+          ];
+          refunds = [{ bodyIdx: 0, percent: adjustedRefundPercent }];
+        }
+
+        // Exit the function here to prevent the request from being forwarded to the FORWARD_URL.
         return sendBundle(req, res, mevshare, targetBlock, body.id, bundle, refunds);
-      } else {
+      } else if (verifiedSignatureSearcherPkey && body.method == "eth_callBundle") {
+        if (!isEthCallBundleParams(body.params)) {
+          Logger.info(req.transactionId, "Received unsupported eth_callBundle request!", { body });
+          res.status(200).send(createJSONRPCErrorResponse(body.id, -32000, "Unsupported eth_callBundle params"));
+          return;
+        }
+
+        Logger.debug(req.transactionId, "Received eth_callBundle request!", { body });
+
+        const backrunTxs = body.params[0].txs;
+        const targetBlock = parseInt(Number(body.params[0].blockNumber).toString());
+
+        const { flashbotsBundleProvider } = await initClients(provider, verifiedSignatureSearcherPkey);
+
         // If configured, simulate the original bundle to check if it reverts without the unlock.
         if (env.passThroughNonReverting) {
           const originalSimulationResponse = await flashbotsBundleProvider.simulate(backrunTxs, targetBlock);
@@ -132,131 +205,64 @@ app.post("/", async (req, res, next) => {
           }
         }
 
-        Logger.debug(req.transactionId, "Finding unlock that does not revert the bundle...");
+        let simulationResponse, unlockTransactionHashes;
+        if (headerOvalAddresses) {
+          Logger.debug(
+            req.transactionId,
+            "Header unlock addresses found: simulating unlock tx bundle and backrun bundle...",
+            headerOvalAddresses,
+          );
 
-        const unlock = await findUnlock(flashbotsBundleProvider, backrunTxs, targetBlock, req);
-        if (!unlock) {
-          Logger.debug(req.transactionId, "No valid unlock found!");
-          await handleUnsupportedRequest(req, res, "No valid unlock found"); // Pass through if no unlock is found.
-          return;
-        }
-        // Dynamically adjust refund percent so that builder nets at least configured minimum. We don't need to consider
-        // refund gas costs as the builder is deducting them from refund and should not include the bundle if refund gas
-        // costs exceed refund value.
-        const adjustedRefundPercent = adjustRefundPercent(
-          unlock.simulationResponse.coinbaseDiff,
-          ovalConfigs[unlock.ovalAddress].refundPercent,
-        );
-        if (adjustedRefundPercent <= 0) {
-          Logger.debug(req.transactionId, `Insufficient builder payment ${unlock.simulationResponse.coinbaseDiff}`);
-          await handleUnsupportedRequest(req, res, "Insufficient builder payment"); // Pass through as minimum payment not met.
-          return;
-        }
+          const { unlockSignedTransactions, unlockTxHashes } = await getUnlockBundlesFromOvalAddresses(
+            flashbotsBundleProvider,
+            backrunTxs,
+            targetBlock,
+            headerOvalAddresses,
+            req,
+          );
+          simulationResponse = await flashbotsBundleProvider.simulate(
+            [...unlockSignedTransactions, ...backrunTxs],
+            targetBlock,
+          );
+          unlockTransactionHashes = unlockTxHashes;
+        } else {
+          Logger.debug(req.transactionId, "Finding unlock that does not revert the bundle...");
 
-        Logger.debug(
-          req.transactionId,
-          `Found valid unlock at ${unlock.ovalAddress}. Sending unlock tx bundle and backrun bundle...`,
-        );
+          const unlock = await findUnlock(flashbotsBundleProvider, backrunTxs, targetBlock, req);
+          if (!unlock) {
+            Logger.debug(req.transactionId, "No valid unlock found!");
+            await handleUnsupportedRequest(req, res, "No valid unlock found"); // Pass through if no unlock is found.
+            return;
+          }
 
-        // Construct the inner bundle with call to Oval to unlock the latest value.
-        const unlockBundle = createUnlockLatestValueBundle(
-          unlock.signedUnlockTx,
-          ovalConfigs[unlock.ovalAddress].refundAddress,
-          targetBlock,
-        );
+          Logger.debug(
+            req.transactionId,
+            `Found valid unlock at ${unlock.ovalAddress}. Simulating unlock tx bundle and backrun bundle...`,
+          );
 
-        // Construct the outer bundle with the modified payload to backrun the UnlockLatestValue call.
-        bundle = [
-          { bundle: unlockBundle },
-          ...backrunTxs.map((tx): { tx: string; canRevert: boolean } => {
-            return { tx, canRevert: false };
-          }),
-        ];
-        refunds = [{ bodyIdx: 0, percent: adjustedRefundPercent }];
-      }
-
-      // Exit the function here to prevent the request from being forwarded to the FORWARD_URL.
-      return sendBundle(req, res, mevshare, targetBlock, body.id, bundle, refunds);
-    } else if (verifiedSignatureSearcherPkey && body.method == "eth_callBundle") {
-      if (!isEthCallBundleParams(body.params)) {
-        Logger.info(req.transactionId, "Received unsupported eth_callBundle request!", { body });
-        res.status(200).send(createJSONRPCErrorResponse(body.id, -32000, "Unsupported eth_callBundle params"));
-        return;
-      }
-
-      Logger.debug(req.transactionId, "Received eth_callBundle request!", { body });
-
-      const backrunTxs = body.params[0].txs;
-      const targetBlock = parseInt(Number(body.params[0].blockNumber).toString());
-
-      const { flashbotsBundleProvider } = await initClients(provider, verifiedSignatureSearcherPkey);
-
-      // If configured, simulate the original bundle to check if it reverts without the unlock.
-      if (env.passThroughNonReverting) {
-        const originalSimulationResponse = await flashbotsBundleProvider.simulate(backrunTxs, targetBlock);
-        if (!originalBundleReverts(originalSimulationResponse, req)) {
-          await handleUnsupportedRequest(req, res, "Original bundle does not revert"); // Pass through if the original bundle doesn't revert.
-          return;
-        }
-      }
-
-      let simulationResponse, unlockTransactionHashes;
-      if (headerOvalAddresses) {
-        Logger.debug(
-          req.transactionId,
-          "Header unlock addresses found: simulating unlock tx bundle and backrun bundle...",
-          headerOvalAddresses,
-        );
-
-        const { unlockSignedTransactions, unlockTxHashes } = await getUnlockBundlesFromOvalAddresses(
-          flashbotsBundleProvider,
-          backrunTxs,
-          targetBlock,
-          headerOvalAddresses,
-          req,
-        );
-        simulationResponse = await flashbotsBundleProvider.simulate(
-          [...unlockSignedTransactions, ...backrunTxs],
-          targetBlock,
-        );
-        unlockTransactionHashes = unlockTxHashes;
-      } else {
-        Logger.debug(req.transactionId, "Finding unlock that does not revert the bundle...");
-
-        const unlock = await findUnlock(flashbotsBundleProvider, backrunTxs, targetBlock, req);
-        if (!unlock) {
-          Logger.debug(req.transactionId, "No valid unlock found!");
-          await handleUnsupportedRequest(req, res, "No valid unlock found"); // Pass through if no unlock is found.
-          return;
+          simulationResponse = await flashbotsBundleProvider.simulate(
+            [unlock.signedUnlockTx, ...backrunTxs],
+            targetBlock,
+          );
+          unlockTransactionHashes = [unlock.unlockTxHash];
         }
 
-        Logger.debug(
-          req.transactionId,
-          `Found valid unlock at ${unlock.ovalAddress}. Simulating unlock tx bundle and backrun bundle...`,
-        );
+        // Send back the simulation response without the unlock transaction.
+        return handleBundleSimulation(simulationResponse, unlockTransactionHashes, req, res);
+      } else await handleUnsupportedRequest(req, res, "Invalid signature or method");
+    } catch (error) {
+      next(error);
+    }
+  });
 
-        simulationResponse = await flashbotsBundleProvider.simulate(
-          [unlock.signedUnlockTx, ...backrunTxs],
-          targetBlock,
-        );
-        unlockTransactionHashes = [unlock.unlockTxHash];
-      }
+  // Health check endpoint.
+  app.get("/ready", (req, res) => {
+    res.status(200).send("OK");
+  });
 
-      // Send back the simulation response without the unlock transaction.
-      return handleBundleSimulation(simulationResponse, unlockTransactionHashes, req, res);
-    } else await handleUnsupportedRequest(req, res, "Invalid signature or method");
-  } catch (error) {
-    next(error);
-  }
-});
+  app.use(expressErrorHandler);
 
-// Health check endpoint.
-app.get("/ready", (req, res) => {
-  res.status(200).send("OK");
-});
-
-app.use(expressErrorHandler);
-
-app.listen(env.port, () => {
-  Logger.debug("Startup", `Server is running on port ${env.port}`);
-});
+  app.listen(env.port, () => {
+    Logger.debug("Startup", `Server is running on port ${env.port}`);
+  });
+})();

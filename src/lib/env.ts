@@ -44,6 +44,7 @@ type EnvironmentVariables = {
   passThroughNonReverting: boolean;
   maxOvalHeaderAddresses: number;
   flashbotsOrigin: string | undefined;
+  gckmsConfig: string;
   chainIdBlockOffsets: {
     [key: number]: number;
   };
@@ -51,6 +52,7 @@ type EnvironmentVariables = {
 
 export const env: EnvironmentVariables = {
   port: getInt(getEnvVar("PORT", fallback.port.toString())),
+  gckmsConfig: getEnvVar("GCKMS_CONFIG", fallback.gckmsConfig),
   authKey: getPrivateKey(getEnvVar("AUTH_PRIVATE_KEY")),
   chainId,
   providerUrl: getEnvVar("PROVIDER_URL"),

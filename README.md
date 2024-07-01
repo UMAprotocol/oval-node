@@ -38,6 +38,7 @@ OVAL_ADDRESS=0x420                            # (Only if not using OVAL_CONFIGS)
 REFUND_ADDRESS=0x42069                        # (Only if not using OVAL_CONFIGS) The refund address you want to send the OEV kickback to.
 REFUND_PERCENT=0.5                            # (Only if not using OVAL_CONFIGS) The percentage of the OEV kickback to send to the refund address.
 SENDER_PRIVATE_KEY=<your_sender_private_key>  # (Only if not using OVAL_CONFIGS) Private key of the actor authorized to call unlockLatestValue on the Oval.
+GCKMS_CONFIG=<gckms_config_json>              # JSON string that specifies the GCKMS configuration for retrieving unlocker keys. (Optional)
 
 AUTH_PRIVATE_KEY=<your_auth_private_key>      # Root private key for deriving searcher-specific keys for signing bundles.
 PROVIDER_URL=<your_provider_url>              # Ethereum mainnet/goerli RPC provider URL.
@@ -47,10 +48,12 @@ CHAIN_ID=<network_chain_id>                   # Chain ID of the Ethereum network
 
 `OVAL_CONFIGS` is a JSON string that maps Oval contract addresses to their specific configurations. Each entry in this JSON object should have the following format:
 
+
 ```json
 {
   "<Oval_Contract_Address>": {
-    "unlockerKey": "<Unlocker_Private_Key>",
+    "unlockerKey": "<Unlocker_Private_Key>", // Optional: Use either this or gckmsKeyId, not both.
+    "gckmsKeyId": "<GCKMS_Key_ID>", // Optional: Use either this or unlockerKey, not both.
     "refundAddress": "<Refund_Address>",
     "refundPercent": <Refund_Percentage>
   }
@@ -59,6 +62,7 @@ CHAIN_ID=<network_chain_id>                   # Chain ID of the Ethereum network
 
 - `Oval_Contract_Address`: The Ethereum address of the Oval instance.
 - `Unlocker_Private_Key`: The private key of the wallet permitted to unlock prices in the specified Oval contract.
+- `GCKMS_Key_ID`: The GCKMS key ID of the wallet permitted to unlock prices in the specified Oval contract.
 - `Refund_Address`: The Ethereum address where refunds will be sent.
 - `Refund_Percentage`: The percentage of the OEV kickback to send to the refund address.
 
