@@ -265,4 +265,3 @@ app.use(expressErrorHandler);
 app.listen(env.port, () => {
   Logger.debug("Startup", `Server is running on port ${env.port}`);
 });
-
