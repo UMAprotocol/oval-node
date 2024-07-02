@@ -324,6 +324,7 @@ export class PrivateKeyManager {
   }
 
   public async initialize(ovalConfigs: OvalConfigs) {
+    // Oval Config addresses are already checksummed.
     for (const [address, config] of Object.entries(ovalConfigs)) {
       if (config.unlockerKey) {
         this.keys[address] = config.unlockerKey;
@@ -339,9 +340,10 @@ export class PrivateKeyManager {
   }
 
   public getWallet(address: string, provider: JsonRpcProvider): Wallet {
-    if (!this.keys[address]) {
+    const checkSummedAddress = getAddress(address);
+    if (!this.keys[checkSummedAddress]) {
       throw new Error(`No unlocker key or GCKMS key ID found for Oval address ${address}`);
     }
-    return new Wallet(this.keys[address]).connect(provider);
+    return new Wallet(this.keys[checkSummedAddress]).connect(provider);
   }
 }
