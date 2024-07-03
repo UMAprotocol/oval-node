@@ -1,7 +1,7 @@
 import { Interface, Transaction, TransactionRequest, Wallet } from "ethers";
 import express from "express";
 import { FlashbotsBundleProvider } from "flashbots-ethers-v6-provider-bundle";
-import { getBaseFee, getMaxBlockByChainId, getProvider, initWallets } from "./helpers";
+import { WalletManager, getBaseFee, getMaxBlockByChainId, getProvider } from "./helpers";
 
 import MevShareClient, { BundleParams } from "@flashbots/mev-share-client";
 import { JSONRPCID, createJSONRPCSuccessResponse } from "json-rpc-2.0";
@@ -55,11 +55,11 @@ export const prepareUnlockTransaction = async (
   simulate = true,
 ) => {
   const provider = getProvider();
-  const unlockerWallets = initWallets(provider);
+  const unlockerWallet = WalletManager.getInstance().getWallet(ovalAddress, provider);
   const [baseFee, network] = await Promise.all([getBaseFee(provider, req), provider.getNetwork()]);
   const data = ovalInterface.encodeFunctionData("unlockLatestValue");
   const { unlockTxHash, signedUnlockTx } = await createUnlockLatestValueTx(
-    unlockerWallets[ovalAddress],
+    unlockerWallet,
     baseFee,
     data,
     network.chainId,

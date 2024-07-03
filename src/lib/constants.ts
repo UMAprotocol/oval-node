@@ -1,6 +1,7 @@
 export const fallback = {
   chainId: 1,
   port: 3000,
+  gckmsConfig: '{"projectId":"keys-oval-8149", "locationId":"us-east1", "keyRingId":"keyring-oval", "cryptoKeyId":"", "ciphertextBucket":"bucket-keyring-oval", "ciphertextFilename":""}',
   forwardUrl: "https://relay.flashbots.net",
   refundPercent: "90",
   builders: [

@@ -20,6 +20,7 @@ import {
   FLASHBOTS_SIGNATURE_HEADER,
   Logger,
   OVAL_ADDRESSES_HEADER,
+  WalletManager,
   Refund,
   adjustRefundPercent,
   createUnlockLatestValueBundle,
@@ -45,6 +46,10 @@ app.use((req, res, next) => {
 
 const provider = getProvider();
 const { ovalConfigs } = env;
+
+// Initialize unlocker wallets for each Oval instance.
+const keyManager = WalletManager.getInstance();
+keyManager.initialize(ovalConfigs);
 
 // Start restful API server to listen for root inbound post requests.
 app.post("/", async (req, res, next) => {
