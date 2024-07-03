@@ -209,5 +209,5 @@ export const sendBundle = async (
   Logger.debug(req.transactionId, "Forwarded a bundle to MEV-Share", { bundleParams });
   Logger.info(req.transactionId, "Bundle accepted by MEV-Share", { bundleHash: backrunResult.bundleHash });
 
-  res.status(200).send(createJSONRPCSuccessResponse(bodyId, backrunResult));
+  return res.status(200).send(createJSONRPCSuccessResponse(bodyId, backrunResult));
 };
