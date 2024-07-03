@@ -126,7 +126,8 @@ app.post("/", async (req, res, next) => {
           },
         ];
 
-        return sendBundle(req, res, mevshare, targetBlock, body.id, bundle, refunds);
+        await sendBundle(req, res, mevshare, targetBlock, body.id, bundle, refunds);
+        return;
       } else {
         // If configured, simulate the original bundle to check if it reverts without the unlock.
         if (env.passThroughNonReverting) {
@@ -181,7 +182,8 @@ app.post("/", async (req, res, next) => {
       }
 
       // Exit the function here to prevent the request from being forwarded to the FORWARD_URL.
-      return sendBundle(req, res, mevshare, targetBlock, body.id, bundle, refunds);
+      await sendBundle(req, res, mevshare, targetBlock, body.id, bundle, refunds);
+      return;
     } else if (verifiedSignatureSearcherPkey && body.method == "eth_callBundle") {
       if (!isEthCallBundleParams(body.params)) {
         Logger.info(req.transactionId, "Received unsupported eth_callBundle request!", { body });
