@@ -310,40 +310,40 @@ export function getMaxBlockByChainId(chainId: number, targetBlock: number) {
   // In mainnet this is always the targetBlock, but in Goerli we add 24 blocks to the targetBlock.
   return targetBlock + env.chainIdBlockOffsets[chainId];
 }
-export class PrivateKeyManager {
-  private static instance: PrivateKeyManager;
-  private keys: Record<string, string> = {};
+export class WalletManager {
+  private static instance: WalletManager;
+  private wallets: Record<string, Wallet> = {};
 
   private constructor() { }
 
-  public static getInstance(): PrivateKeyManager {
-    if (!PrivateKeyManager.instance) {
-      PrivateKeyManager.instance = new PrivateKeyManager();
+  public static getInstance(): WalletManager {
+    if (!WalletManager.instance) {
+      WalletManager.instance = new WalletManager();
     }
-    return PrivateKeyManager.instance;
+    return WalletManager.instance;
   }
 
   public async initialize(ovalConfigs: OvalConfigs) {
     // Oval Config addresses are already checksummed.
     for (const [address, config] of Object.entries(ovalConfigs)) {
       if (config.unlockerKey) {
-        this.keys[address] = config.unlockerKey;
+        this.wallets[address] = new Wallet(config.unlockerKey);
       } else if (config.gckmsKeyId) {
         const gckmsKey = await retrieveGckmsKey({
           ...JSON.parse(env.gckmsConfig),
           cryptoKeyId: config.gckmsKeyId,
           ciphertextFilename: `${config.gckmsKeyId}.enc`,
         });
-        this.keys[address] = gckmsKey;
+        this.wallets[address] = new Wallet(gckmsKey);
       }
     }
   }
 
   public getWallet(address: string, provider: JsonRpcProvider): Wallet {
     const checkSummedAddress = getAddress(address);
-    if (!this.keys[checkSummedAddress]) {
+    if (!this.wallets[checkSummedAddress]) {
       throw new Error(`No unlocker key or GCKMS key ID found for Oval address ${address}`);
     }
-    return new Wallet(this.keys[checkSummedAddress]).connect(provider);
+    return this.wallets[checkSummedAddress].connect(provider);
   }
 }
