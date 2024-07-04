@@ -204,7 +204,7 @@ function isOvalConfigs(input: unknown): input is OvalConfigs {
     Object.keys(input).length === new Set(Object.keys(input)).size &&
     Object.keys(input).every((key) => isAddress(key)) &&
     Object.values(input).every((value) => isOvalConfig(value)) &&
-    Object.values(input).length === new Set(Object.values(input).map((value) => value.unlockerKey)).size
+    Object.values(input).length === new Set(Object.values(input).map((value) => value.unlockerKey || value.gckmsKeyId)).size
   );
 }
 
