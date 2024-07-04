@@ -1,5 +1,6 @@
 export interface OvalConfig {
-  unlockerKey: string;
+  unlockerKey?: string;
+  gckmsKeyId?: string;
   refundAddress: string;
   refundPercent: number;
 }

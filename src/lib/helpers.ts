@@ -17,21 +17,11 @@ import { flashbotsSupportedNetworks, supportedNetworks } from "./constants";
 import { env } from "./env";
 import { Logger } from "./logging";
 import { OvalAddressConfigList, OvalConfig, OvalConfigs } from "./types";
+import { retrieveGckmsKey } from "./gckms";
 
 export function getProvider() {
   const network = new Network(supportedNetworks[env.chainId], env.chainId);
   return new JsonRpcProvider(env.providerUrl, network);
-}
-
-// Initialize unlocker wallets for each Oval instance.
-export function initWallets(provider: JsonRpcProvider) {
-  return Object.entries(env.ovalConfigs).reduce(
-    (wallets, [address, config]) => {
-      wallets[address] = new Wallet(config.unlockerKey).connect(provider);
-      return wallets;
-    },
-    {} as Record<string, Wallet>,
-  );
 }
 
 export async function initClients(provider: JsonRpcProvider, searcherPublicKey: string) {
@@ -186,10 +176,14 @@ function isOvalConfig(input: unknown): input is OvalConfig {
     typeof input === "object" &&
     input !== null &&
     !Array.isArray(input) &&
-    "unlockerKey" in input &&
-    typeof input["unlockerKey"] === "string" &&
-    ((!input["unlockerKey"].startsWith("0x") && isHexString("0x" + input["unlockerKey"], 32)) ||
-      isHexString(input["unlockerKey"], 32)) &&
+    (
+      ("unlockerKey" in input && typeof input["unlockerKey"] === "string" &&
+        ((!input["unlockerKey"].startsWith("0x") && isHexString("0x" + input["unlockerKey"], 32)) ||
+          isHexString(input["unlockerKey"], 32)) &&
+        !("gckmsKeyId" in input)) ||
+      ("gckmsKeyId" in input && typeof input["gckmsKeyId"] === "string" &&
+        !("unlockerKey" in input))
+    ) &&
     "refundAddress" in input &&
     typeof input["refundAddress"] === "string" &&
     isAddress(input["refundAddress"]) &&
@@ -219,6 +213,7 @@ const normaliseOvalConfigs = (config: OvalConfigs): OvalConfigs => {
   for (const [address, ovalConfig] of Object.entries(config)) {
     normalised[getAddress(address)] = {
       unlockerKey: ovalConfig.unlockerKey,
+      gckmsKeyId: ovalConfig.gckmsKeyId,
       refundAddress: getAddress(ovalConfig.refundAddress),
       refundPercent: ovalConfig.refundPercent,
     };
@@ -314,4 +309,41 @@ export function getPrivateKey(input: string): string {
 export function getMaxBlockByChainId(chainId: number, targetBlock: number) {
   // In mainnet this is always the targetBlock, but in Goerli we add 24 blocks to the targetBlock.
   return targetBlock + env.chainIdBlockOffsets[chainId];
+}
+export class WalletManager {
+  private static instance: WalletManager;
+  private wallets: Record<string, Wallet> = {};
+
+  private constructor() { }
+
+  public static getInstance(): WalletManager {
+    if (!WalletManager.instance) {
+      WalletManager.instance = new WalletManager();
+    }
+    return WalletManager.instance;
+  }
+
+  public async initialize(ovalConfigs: OvalConfigs) {
+    // Oval Config addresses are already checksummed.
+    for (const [address, config] of Object.entries(ovalConfigs)) {
+      if (config.unlockerKey) {
+        this.wallets[address] = new Wallet(config.unlockerKey);
+      } else if (config.gckmsKeyId) {
+        const gckmsKey = await retrieveGckmsKey({
+          ...JSON.parse(env.gckmsConfig),
+          cryptoKeyId: config.gckmsKeyId,
+          ciphertextFilename: `${config.gckmsKeyId}.enc`,
+        });
+        this.wallets[address] = new Wallet(gckmsKey);
+      }
+    }
+  }
+
+  public getWallet(address: string, provider: JsonRpcProvider): Wallet {
+    const checkSummedAddress = getAddress(address);
+    if (!this.wallets[checkSummedAddress]) {
+      throw new Error(`No unlocker key or GCKMS key ID found for Oval address ${address}`);
+    }
+    return this.wallets[checkSummedAddress].connect(provider);
+  }
 }
