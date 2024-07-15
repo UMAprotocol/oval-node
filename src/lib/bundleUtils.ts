@@ -55,7 +55,7 @@ export const prepareUnlockTransaction = async (
   simulate = true,
 ) => {
   const provider = getProvider();
-  const unlockerWallet = WalletManager.getInstance().getWallet(ovalAddress, provider);
+  const unlockerWallet = WalletManager.getInstance(provider).getWallet(ovalAddress);
   const [baseFee, network] = await Promise.all([getBaseFee(provider, req), provider.getNetwork()]);
   const data = ovalInterface.encodeFunctionData("unlockLatestValue");
   const { unlockTxHash, signedUnlockTx } = await createUnlockLatestValueTx(
@@ -80,9 +80,9 @@ export const getUnlockBundlesFromOvalAddresses = async (
   ovalAddresses: string[],
   req: express.Request,
 ) => {
-  const unlockBundles = [];
-  const unlockSignedTransactions = [];
-  const unlockTxHashes = [];
+  const unlockBundles: { bundle: BundleParams }[] = [];
+  const unlockSignedTransactions: string[] = [];
+  const unlockTxHashes: string[] = [];
   for (const ovalAddress of ovalAddresses) {
     const unlock = await prepareUnlockTransaction(
       flashbotsBundleProvider,

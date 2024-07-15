@@ -20,3 +20,21 @@ export interface UnlockAddress {
 }
 
 export type OvalAddressConfigList = string[];
+
+export type EnvironmentVariables = {
+  port: number;
+  authKey: string;
+  chainId: number;
+  providerUrl: string;
+  ovalConfigs: OvalConfigs;
+  forwardUrl: string;
+  builders: string[];
+  minNetBuilderPaymentWei: bigint;
+  passThroughNonReverting: boolean;
+  maxOvalHeaderAddresses: number;
+  flashbotsOrigin: string | undefined;
+  gckmsConfig: string;
+  chainIdBlockOffsets: {
+    [key: number]: number;
+  };
+};
