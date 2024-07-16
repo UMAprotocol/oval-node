@@ -17,9 +17,9 @@ type WalletUsed = {
 // WalletManager class to handle wallet operations.
 export class WalletManager {
     private static instance: WalletManager;
-    private wallets: Record<string /*Oval address*/, Wallet> = {};
-    private sharedWallets: Map<string/*Wallet PubKey address*/, Wallet> = new Map();
-    private sharedWalletUsage: Map<string /*Oval address*/, Array<WalletUsed>> = new Map();
+    private wallets: Record<string, Wallet> = {};
+    private sharedWallets: Map<string, Wallet> = new Map();
+    private sharedWalletUsage: Map<string, Array<WalletUsed>> = new Map();
     private provider: JsonRpcProvider;
 
     private constructor(provider: JsonRpcProvider) {
@@ -87,7 +87,7 @@ export class WalletManager {
         setInterval(async () => {
             const currentBlock = await this.provider.getBlockNumber();
             this.cleanupOldRecords(currentBlock);
-        }, 20 * 60 * 1000); // 20 minutes
+        }, env.sharedWalletUsageCleanupInterval * 1000);
     }
 
     private async initializeWallets(configs: OvalConfigs): Promise<void> {
@@ -126,10 +126,12 @@ export class WalletManager {
         let selectedWallet: Wallet | undefined;
         const usageCount = new Map<string, number>()
 
+        // Initialize usage counts for each wallet
         this.sharedWallets.forEach((_, walletPubKey) => {
             usageCount.set(walletPubKey, 0);
         });
 
+        // Sum usage counts for each wallet
         this.sharedWalletUsage.forEach((usageRecords, _) => {
             usageRecords.forEach((record) => {
                 const count = usageCount.get(record.walletPubKey) || 0;

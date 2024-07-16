@@ -48,6 +48,7 @@ type EnvironmentVariables = {
   chainIdBlockOffsets: {
     [key: number]: number;
   };
+  sharedWalletUsageCleanupInterval: number;
 };
 
 export const env: EnvironmentVariables = {
@@ -69,4 +70,5 @@ export const env: EnvironmentVariables = {
     [MAINNET_CHAIN_ID]: getInt(getEnvVar("MAINNET_BLOCK_OFFSET", "0")),
     [SEPOLIA_CHAIN_ID]: getInt(getEnvVar("SEPOLIA_BLOCK_OFFSET", "24")),
   },
+  sharedWalletUsageCleanupInterval: getInt(getEnvVar("SHARED_WALLET_USAGE_CLEANUP_INTERVAL", "60")),
 };
