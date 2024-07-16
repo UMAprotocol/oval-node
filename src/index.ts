@@ -45,11 +45,11 @@ app.use((req, res, next) => {
 });
 
 const provider = getProvider();
-const { ovalConfigs } = env;
+const { ovalConfigs, ovalConfigsShared } = env;
 
 // Initialize unlocker wallets for each Oval instance.
-const keyManager = WalletManager.getInstance(provider);
-keyManager.initialize(ovalConfigs);
+const walletManager = WalletManager.getInstance(provider);
+walletManager.initialize(ovalConfigs, ovalConfigsShared);
 
 // Start restful API server to listen for root inbound post requests.
 app.post("/", async (req, res, next) => {

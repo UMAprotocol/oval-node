@@ -1,8 +1,8 @@
 import dotenv from "dotenv";
 import { getAddress, parseEther } from "ethers";
 import { MAINNET_CHAIN_ID, SEPOLIA_CHAIN_ID, fallback, supportedNetworks } from "./constants";
-import { getBoolean, getFloat, getInt, getOvalConfigs, getPrivateKey, getStringArray } from "./helpers";
-import { OvalConfigs } from "./types";
+import { getBoolean, getFloat, getInt, getOvalConfigs, getOvalConfigsShared, getPrivateKey, getStringArray } from "./helpers";
+import { OvalConfigs, OvalConfigsShared } from "./types";
 dotenv.config({ path: ".env" });
 
 function getEnvVar(varName: string, defaultValue?: string): string {
@@ -38,6 +38,7 @@ type EnvironmentVariables = {
   chainId: number;
   providerUrl: string;
   ovalConfigs: OvalConfigs;
+  ovalConfigsShared: OvalConfigsShared;
   forwardUrl: string;
   builders: string[];
   minNetBuilderPaymentWei: bigint;
@@ -58,6 +59,7 @@ export const env: EnvironmentVariables = {
   chainId,
   providerUrl: getEnvVar("PROVIDER_URL"),
   ovalConfigs: getOvalConfigs(getEnvVar("OVAL_CONFIGS", stringifiedFallbackOvalConfigs)),
+  ovalConfigsShared: getOvalConfigsShared(getEnvVar("OVAL_CONFIGS_SHARED", "[]")),
   forwardUrl: getEnvVar("FORWARD_URL", fallback.forwardUrl),
   builders: getStringArray(getEnvVar("BUILDERS", JSON.stringify(fallback.builders))),
   minNetBuilderPaymentWei: parseEther(getEnvVar("MIN_NET_BUILDER_PAYMENT", fallback.minNetBuilderPayment)),

@@ -16,8 +16,7 @@ import { JSONRPCRequest } from "json-rpc-2.0";
 import { flashbotsSupportedNetworks, supportedNetworks } from "./constants";
 import { env } from "./env";
 import { Logger } from "./logging";
-import { OvalAddressConfigList, OvalConfig, OvalConfigs } from "./types";
-import { retrieveGckmsKey } from "./gckms";
+import { OvalAddressConfigList, OvalConfig, OvalConfigShared, OvalConfigs, OvalConfigsShared } from "./types";
 
 export function getProvider() {
   const network = new Network(supportedNetworks[env.chainId], env.chainId);
@@ -235,6 +234,48 @@ export function getOvalConfigs(input: string): OvalConfigs {
   }
 
   throw new Error(`Value "${input}" is valid JSON but is not OvalConfigs records`);
+}
+
+// Type guard for OvalConfigShared.
+function isOvalConfigShared(input: unknown): input is OvalConfigShared {
+  return (
+    typeof input === "object" &&
+    input !== null &&
+    !Array.isArray(input) &&
+    (
+      ("unlockerKey" in input && typeof input["unlockerKey"] === "string" &&
+        ((!input["unlockerKey"].startsWith("0x") && isHexString("0x" + input["unlockerKey"], 32)) ||
+          isHexString(input["unlockerKey"], 32)) &&
+        !("gckmsKeyId" in input)) ||
+      ("gckmsKeyId" in input && typeof input["gckmsKeyId"] === "string" &&
+        !("unlockerKey" in input))
+    )
+  );
+}
+
+// Type guard for OvalConfigsShared.
+function isOvalConfigsShared(input: unknown): input is OvalConfigsShared {
+  return (
+    Array.isArray(input) &&
+    input.every((value) => isOvalConfigShared(value)) &&
+    input.length === new Set(input.map((value) => value.unlockerKey || value.gckmsKeyId)).size
+  );
+}
+
+export function getOvalConfigsShared(input: string): OvalConfigsShared {
+  let parsedInput: unknown;
+
+  try {
+    parsedInput = JSON.parse(input);
+  } catch (error) {
+    throw new Error(`Value "${input}" cannot be converted to OvalConfigsShared records`);
+  }
+
+  if (isOvalConfigsShared(parsedInput)) {
+    return parsedInput;
+  }
+
+  throw new Error(`Value "${input}" is valid JSON but is not OvalConfigsShared records`);
 }
 
 // Get OvalAddressConfigList from the header string or throw an error if the header is invalid.
