@@ -46,7 +46,6 @@
     "build": "tsc",
     "test": " mocha",
     "start": "node ./out/index.js",
-    "lint": "prettier './**/*.ts' --write",
-    "generate-contract-types": "rm -rf src/contract-types && mkdir -p src/contract-types && typechain --target ethers-v6 --out-dir src/contract-types 'src/abi/*.json'"
+    "lint": "prettier './**/*.ts' --write"
   }
 }
