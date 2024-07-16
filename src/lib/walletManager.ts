@@ -1,5 +1,5 @@
 import { JsonRpcProvider, Wallet, getAddress } from "ethers";
-import { OvalConfigs } from "./types";
+import { OvalConfigs, OvalConfigsShared } from "./types";
 import { retrieveGckmsKey } from "./gckms";
 import { env } from "./env";
 
@@ -18,7 +18,7 @@ export class WalletManager {
 
     private constructor(provider: JsonRpcProvider) {
         this.provider = provider;
-        this.setupCleanupInterval();
+        // this.setupCleanupInterval();
     }
 
     // Singleton pattern to get an instance of WalletManager
@@ -30,7 +30,7 @@ export class WalletManager {
     }
 
     // Initialize wallets with configurations
-    public async initialize(ovalConfigs: OvalConfigs, sharedConfigs?: OvalConfigs): Promise<void> {
+    public async initialize(ovalConfigs: OvalConfigs, sharedConfigs?: OvalConfigsShared): Promise<void> {
         await this.initializeWallets(ovalConfigs);
         if (sharedConfigs) {
             await this.initializeSharedWallets(sharedConfigs);
@@ -80,8 +80,8 @@ export class WalletManager {
         }
     }
 
-    private async initializeSharedWallets(configs: OvalConfigs): Promise<void> {
-        for (const config of Object.values(configs)) {
+    private async initializeSharedWallets(configs: OvalConfigsShared): Promise<void> {
+        for (const config of configs) {
             const wallet = await this.createWallet(config);
             if (wallet) {
                 this.walletUsage.set(wallet, new Map());

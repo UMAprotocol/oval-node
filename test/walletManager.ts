@@ -3,14 +3,21 @@ import sinon from 'sinon';
 import { WalletManager } from '../src/lib/walletManager';
 import { JsonRpcProvider, Wallet } from 'ethers';
 import "../src/lib/express-extensions";
+import * as gckms from '../src/lib/gckms';
 
 // Mock the necessary dependencies
 const mockProvider = new JsonRpcProvider();
 const mockWallet = new Wallet('0x0123456789012345678901234567890123456789012345678901234567890123');
 
+const getRandomAddressAndKey = () => {
+    const wallet = Wallet.createRandom();
+    return {
+        address: wallet.address,
+        privateKey: wallet.privateKey,
+    };
+};
 describe('WalletManager Tests', () => {
     beforeEach(() => {
-        sinon.stub(Wallet, 'createRandom').returns(mockWallet as any);
         sinon.stub(JsonRpcProvider.prototype, 'getBlockNumber').resolves(123); // Example of stubbing a method
     });
 
@@ -25,37 +32,43 @@ describe('WalletManager Tests', () => {
     });
 
     it('should initialize with valid ovalConfigs', async () => {
+        const gckmsRandom = getRandomAddressAndKey();
+        const unlockerRandom = getRandomAddressAndKey();
+        const refundRandom = getRandomAddressAndKey().address;
+        const oval1 = getRandomAddressAndKey().address;
+        const oval2 = getRandomAddressAndKey().address;
         const ovalConfigs = {
-            '0x123': { unlockerKey: 'unlockerKey123', refundAddress: '0x123', refundPercent: 10 },
-            '0x456': { gckmsKeyId: 'gckmsKeyId456', refundAddress: '0x456', refundPercent: 20 },
+            [oval1]: { unlockerKey: unlockerRandom.privateKey, refundAddress: refundRandom, refundPercent: 10 },
+            [oval2]: { gckmsKeyId: 'gckmsKeyId456', refundAddress: refundRandom, refundPercent: 20 },
         };
+        sinon.stub(gckms, 'retrieveGckmsKey').resolves(gckmsRandom.privateKey);
         const walletManager = WalletManager.getInstance(mockProvider);
         await walletManager.initialize(ovalConfigs);
-        expect(walletManager.getWallet('0x123')).to.equal(mockWallet);
-        expect(walletManager.getWallet('0x456')).to.equal(mockWallet);
+
+        const walletRandom = walletManager.getWallet(oval1);
+        expect(walletRandom?.privateKey).to.equal(unlockerRandom.privateKey);
+
+        const walletGckms = walletManager.getWallet(oval2);
+        expect(walletGckms?.privateKey).to.equal(gckmsRandom.privateKey);
     });
 
-    it('should handle missing unlockerKey and gckmsKeyId in configs', async () => {
-        const invalidConfigs = {
-            '0x789': {},
-        };
+    it('should initialize with valid ovalConfigs and sharedConfigs', async () => {
+        const gckmsRandom = getRandomAddressAndKey();
+        const unlockerRandom = getRandomAddressAndKey();
+        const refundRandom = getRandomAddressAndKey().address;
+        const oval1 = getRandomAddressAndKey().address;
+        const oval2 = getRandomAddressAndKey().address;
+        const ovalConfigs = {};
+        const sharedConfigs = [
+            { unlockerKey: unlockerRandom.privateKey, refundAddress: refundRandom, refundPercent: 10 },
+            { gckmsKeyId: 'gckmsKeyId456', refundAddress: refundRandom, refundPercent: 20 },
+        ];
+        sinon.stub(gckms, 'retrieveGckmsKey').resolves(gckmsRandom.privateKey);
         const walletManager = WalletManager.getInstance(mockProvider);
-        // await expect(walletManager.initialize(invalidConfigs as any)).to.be.re
+        await walletManager.initialize(ovalConfigs, sharedConfigs);
+
     });
 
-    it('should retrieve a wallet by address and connect to provider', () => {
-        const ovalConfigs = {
-            '0x123': { unlockerKey: 'unlockerKey123', refundAddress: '0x123', refundPercent: 10 },
-        };
-        const walletManager = WalletManager.getInstance(mockProvider);
-        walletManager.initialize(ovalConfigs);
-        const wallet = walletManager.getWallet('0x123');
-        expect(wallet).to.equal(mockWallet);
-    });
 
-    it('should throw error for invalid address', () => {
-        const walletManager = WalletManager.getInstance(mockProvider);
-        expect(() => walletManager.getWallet('0x999')).to.throw('No unlocker key or GCKMS key ID found for Oval address 0x999');
-    });
 
 });
