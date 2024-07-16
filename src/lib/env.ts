@@ -1,7 +1,7 @@
 import dotenv from "dotenv";
 import { getAddress, parseEther } from "ethers";
 import { MAINNET_CHAIN_ID, SEPOLIA_CHAIN_ID, fallback, supportedNetworks } from "./constants";
-import { getBoolean, getFloat, getInt, getOvalConfigs, getPrivateKey, getStringArray } from "./helpers";
+import { getBoolean, getFloat, getInt, getOvalConfigs, getPrivateKey, getStringArray, isMochaTest } from "./helpers";
 import { OvalConfigs } from "./types";
 dotenv.config({ path: ".env" });
 
@@ -9,10 +9,7 @@ function getEnvVar(varName: string, defaultValue?: string): string {
   const envValue = process.env[varName];
   if (envValue !== undefined) return envValue;
   if (defaultValue !== undefined) return defaultValue;
-  if (typeof global.it === 'function') {
-    // Not running in a Mocha test
-    return "";
-  }
+  if (isMochaTest()) return "";
   throw new Error(`Environment error: ${varName} not set.`);
 }
 

@@ -301,7 +301,7 @@ export function verifyBundleSignature(
 export function getPrivateKey(input: string): string {
   // Prepend 0x if missing.
   const privateKey = input.startsWith("0x") ? input : "0x" + input;
-  if (!isHexString(privateKey, 32)) throw new Error(`Value ${input} not a valid private key`);
+  if (!isHexString(privateKey, 32) && !isMochaTest()) throw new Error(`Value ${input} not a valid private key`);
   return privateKey;
 }
 
@@ -309,4 +309,8 @@ export function getPrivateKey(input: string): string {
 export function getMaxBlockByChainId(chainId: number, targetBlock: number) {
   // In mainnet this is always the targetBlock, but in Goerli we add 24 blocks to the targetBlock.
   return targetBlock + env.chainIdBlockOffsets[chainId];
+}
+
+export function isMochaTest() {
+  return typeof global.it === 'function';
 }

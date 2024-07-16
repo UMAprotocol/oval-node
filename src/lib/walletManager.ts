@@ -2,6 +2,7 @@ import { JsonRpcProvider, Wallet, getAddress } from "ethers";
 import { OvalConfigs, OvalConfigsShared } from "./types";
 import { retrieveGckmsKey } from "./gckms";
 import { env } from "./env";
+import { isMochaTest } from "./helpers";
 
 type WalletConfig = {
     unlockerKey?: string;
@@ -80,10 +81,7 @@ export class WalletManager {
 
     // Private helper methods
     private setupCleanupInterval(): void {
-        if (typeof global.it === 'function') {
-            // Not running in a Mocha test
-            return;
-        }
+        if (isMochaTest()) return;
         setInterval(async () => {
             const currentBlock = await this.provider.getBlockNumber();
             this.cleanupOldRecords(currentBlock);
