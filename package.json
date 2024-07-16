@@ -38,8 +38,7 @@
     "chai": "^4.4.1",
     "dotenv": "^16.3.1",
     "mocha": "^10.6.0",
-    "sinon": "^18.0.0",
-    "typechain": "^8.3.2"
+    "sinon": "^18.0.0"
   },
   "scripts": {
     "dev": "nodemon",
