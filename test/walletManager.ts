@@ -6,7 +6,6 @@ import "../src/lib/express-extensions";
 import * as gckms from '../src/lib/gckms';
 import { OvalConfigs, OvalConfigsShared } from '../src/lib/types';
 
-// Mock the necessary dependencies
 const mockProvider = new JsonRpcProvider();
 
 const getRandomAddressAndKey = () => {
@@ -18,9 +17,6 @@ const getRandomAddressAndKey = () => {
 };
 
 describe('WalletManager Tests', () => {
-    beforeEach(() => {
-        sinon.stub(JsonRpcProvider.prototype, 'getBlockNumber').resolves(123); // Example of stubbing a method
-    });
 
     afterEach(() => {
         sinon.restore();
