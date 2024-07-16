@@ -67,7 +67,7 @@ export class WalletManager {
         }
 
         // If no wallet has been assigned, find the least used wallet
-        const selectedWallet = this.findLeastUsedWallet(targetBlock);
+        const selectedWallet = this.findLeastUsedWallet();
         if (selectedWallet) {
             this.updateWalletUsage(ovalInstance, selectedWallet, targetBlock);
             const selectedWalletPubKey = selectedWallet.address;
@@ -122,7 +122,7 @@ export class WalletManager {
         throw new Error('Invalid wallet configuration');
     }
 
-    private findLeastUsedWallet(targetBlock: number): Wallet | undefined {
+    private findLeastUsedWallet(): Wallet | undefined {
         let selectedWallet: Wallet | undefined;
         const usageCount = new Map<string, number>()
 
