@@ -48,7 +48,7 @@ const provider = getProvider();
 const { ovalConfigs } = env;
 
 // Initialize unlocker wallets for each Oval instance.
-const keyManager = WalletManager.getInstance();
+const keyManager = WalletManager.getInstance(provider);
 keyManager.initialize(ovalConfigs);
 
 // Start restful API server to listen for root inbound post requests.

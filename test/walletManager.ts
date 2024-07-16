@@ -4,10 +4,10 @@ import { WalletManager } from '../src/lib/walletManager';
 import { JsonRpcProvider, Wallet } from 'ethers';
 import "../src/lib/express-extensions";
 import * as gckms from '../src/lib/gckms';
+import { OvalConfigs, OvalConfigsShared } from '../src/lib/types';
 
 // Mock the necessary dependencies
 const mockProvider = new JsonRpcProvider();
-const mockWallet = new Wallet('0x0123456789012345678901234567890123456789012345678901234567890123');
 
 const getRandomAddressAndKey = () => {
     const wallet = Wallet.createRandom();
@@ -16,6 +16,7 @@ const getRandomAddressAndKey = () => {
         privateKey: wallet.privateKey,
     };
 };
+
 describe('WalletManager Tests', () => {
     beforeEach(() => {
         sinon.stub(JsonRpcProvider.prototype, 'getBlockNumber').resolves(123); // Example of stubbing a method
@@ -37,7 +38,7 @@ describe('WalletManager Tests', () => {
         const refundRandom = getRandomAddressAndKey().address;
         const oval1 = getRandomAddressAndKey().address;
         const oval2 = getRandomAddressAndKey().address;
-        const ovalConfigs = {
+        const ovalConfigs: OvalConfigs = {
             [oval1]: { unlockerKey: unlockerRandom.privateKey, refundAddress: refundRandom, refundPercent: 10 },
             [oval2]: { gckmsKeyId: 'gckmsKeyId456', refundAddress: refundRandom, refundPercent: 20 },
         };
@@ -45,30 +46,83 @@ describe('WalletManager Tests', () => {
         const walletManager = WalletManager.getInstance(mockProvider);
         await walletManager.initialize(ovalConfigs);
 
-        const walletRandom = walletManager.getWallet(oval1);
+        const walletRandom = walletManager.getWallet(oval1, 123);
         expect(walletRandom?.privateKey).to.equal(unlockerRandom.privateKey);
 
-        const walletGckms = walletManager.getWallet(oval2);
+        const walletGckms = walletManager.getWallet(oval2, 123);
         expect(walletGckms?.privateKey).to.equal(gckmsRandom.privateKey);
     });
 
     it('should initialize with valid ovalConfigs and sharedConfigs', async () => {
         const gckmsRandom = getRandomAddressAndKey();
         const unlockerRandom = getRandomAddressAndKey();
-        const refundRandom = getRandomAddressAndKey().address;
-        const oval1 = getRandomAddressAndKey().address;
-        const oval2 = getRandomAddressAndKey().address;
-        const ovalConfigs = {};
-        const sharedConfigs = [
-            { unlockerKey: unlockerRandom.privateKey, refundAddress: refundRandom, refundPercent: 10 },
-            { gckmsKeyId: 'gckmsKeyId456', refundAddress: refundRandom, refundPercent: 20 },
+        const sharedConfigs: OvalConfigsShared = [
+            { unlockerKey: unlockerRandom.privateKey },
+            { gckmsKeyId: 'gckmsKeyId456' },
         ];
         sinon.stub(gckms, 'retrieveGckmsKey').resolves(gckmsRandom.privateKey);
         const walletManager = WalletManager.getInstance(mockProvider);
-        await walletManager.initialize(ovalConfigs, sharedConfigs);
+        await walletManager.initialize({}, sharedConfigs);
 
+        // Check if shared wallets are initialized
+        const sharedWallets = Array.from(walletManager['sharedWallets'].values());
+        expect(sharedWallets).to.have.lengthOf(2);
     });
 
+    it('should return the same shared wallet for the same ovalInstance', async () => {
+        const unlockerRandom = getRandomAddressAndKey();
+        const sharedConfigs: OvalConfigsShared = [
+            { unlockerKey: unlockerRandom.privateKey },
+        ];
+        const walletManager = WalletManager.getInstance(mockProvider);
+        await walletManager.initialize({}, sharedConfigs);
 
+        const ovalInstance = 'ovalInstance1';
+        const targetBlock = 123;
 
+        const wallet1 = await walletManager['getSharedWallet'](ovalInstance, targetBlock);
+        const wallet2 = await walletManager['getSharedWallet'](ovalInstance, targetBlock + 1);
+
+        expect(wallet1.address).to.equal(wallet2.address);
+    });
+
+    it('should assign the least used shared wallet when no previous assignment exists', async () => {
+        const unlockerRandom1 = getRandomAddressAndKey();
+        const unlockerRandom2 = getRandomAddressAndKey();
+        const sharedConfigs: OvalConfigsShared = [
+            { unlockerKey: unlockerRandom1.privateKey },
+            { unlockerKey: unlockerRandom2.privateKey },
+        ];
+        const walletManager = WalletManager.getInstance(mockProvider);
+        await walletManager.initialize({}, sharedConfigs);
+
+        const ovalInstance1 = 'ovalInstance1';
+        const ovalInstance2 = 'ovalInstance2';
+        const targetBlock = 123;
+
+        const wallet1 = await walletManager['getSharedWallet'](ovalInstance1, targetBlock);
+        const wallet2 = await walletManager['getSharedWallet'](ovalInstance2, targetBlock);
+
+        // As these are the first assignments, wallet1 and wallet2 should be different
+        expect(wallet1.address).to.not.equal(wallet2.address);
+    });
+
+    it('should cleanup old records correctly', async () => {
+        const unlockerRandom = getRandomAddressAndKey();
+        const sharedConfigs: OvalConfigsShared = [
+            { unlockerKey: unlockerRandom.privateKey },
+        ];
+        const walletManager = WalletManager.getInstance(mockProvider);
+        await walletManager.initialize({}, sharedConfigs);
+
+        const ovalInstance = 'ovalInstance1';
+        const targetBlock = 123;
+
+        await walletManager['getSharedWallet'](ovalInstance, targetBlock);
+
+        walletManager['cleanupOldRecords'](targetBlock + 2);
+
+        const sharedWalletUsage = walletManager['sharedWalletUsage'].get(ovalInstance);
+        expect(sharedWalletUsage).to.be.undefined;
+    });
 });
