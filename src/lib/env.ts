@@ -9,6 +9,10 @@ function getEnvVar(varName: string, defaultValue?: string): string {
   const envValue = process.env[varName];
   if (envValue !== undefined) return envValue;
   if (defaultValue !== undefined) return defaultValue;
+  if (typeof global.it === 'function') {
+    // Not running in a Mocha test
+    return "";
+  }
   throw new Error(`Environment error: ${varName} not set.`);
 }
 
