@@ -25,6 +25,15 @@ jobs:
       - name: "Install Node.js dependencies"
         run: "yarn install"
 
+      - name: "Create .env file"
+        run: |
+          echo 'PROVIDER_URL="https://mainnet.infura.io/v3/00000000000000000000000000000000"' > .env
+          echo 'PROVIDER_WSS="wss://mainnet.infura.io/ws/v3/00000000000000000000000000000000"' >> .env
+          echo 'FORWARD_URL="https://relay.flashbots.net"' >> .env
+          echo 'OVAL_CONFIGS="{\"0x0000000000000000000000000000000000000000\":{\"refundAddress\":\"0x0000000000000000000000000000000000000000\",\"refundPercent\":90,\"unlockerKey\":\"0x0000000000000000000000000000000000000000000000000000000000000000\"}}"' >> .env
+          echo 'AUTH_PRIVATE_KEY="0x0000000000000000000000000000000000000000000000000000000000000000"' >> .env
+          echo 'MAINNET_BLOCK_OFFSET=5' >> .env
+
       - name: "Run the tests"
         run: "yarn test"
 
