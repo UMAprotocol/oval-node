@@ -1,7 +1,7 @@
 import { Interface, Transaction, TransactionRequest, Wallet } from "ethers";
 import express from "express";
 import { FlashbotsBundleProvider } from "flashbots-ethers-v6-provider-bundle";
-import { getBaseFee, getMaxBlockByChainId, getOvalRefundConfig, getProvider } from "./helpers";
+import { getBaseFee, getMaxBlockByChainId, getOvalAddresses, getOvalRefundConfig, getProvider } from "./helpers";
 import { WalletManager } from "./walletManager";
 
 import MevShareClient, { BundleParams } from "@flashbots/mev-share-client";
@@ -117,10 +117,8 @@ export const findUnlock = async (
   targetBlock: number,
   req: express.Request,
 ) => {
-  const factoryInstances = OvalDiscovery.getInstance().getOvalFactoryInstances();
-
   const unlocks = await Promise.all(
-    [...factoryInstances, ...Object.keys(ovalConfigs)].map(async (ovalAddress) =>
+    getOvalAddresses().map(async (ovalAddress) =>
       prepareUnlockTransaction(flashbotsBundleProvider, backrunTxs, targetBlock, ovalAddress, req),
     ),
   );
