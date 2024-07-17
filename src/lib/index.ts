@@ -5,3 +5,4 @@ export * from "./logging";
 export * from "./bundleUtils";
 export * from "./constants";
 export * from "./walletManager";
+export * from "./ovalDiscovery";

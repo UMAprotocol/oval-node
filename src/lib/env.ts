@@ -50,6 +50,13 @@ type EnvironmentVariables = {
     [key: number]: number;
   };
   sharedWalletUsageCleanupInterval: number;
+  standardCoinbaseFactory: string;
+  standardChainlinkFactory: string;
+  standardChronicleFactory: string;
+  standardPythFactory: string;
+  defaultRefundAddress: string;
+  defaultRefundPercent: number;
+  ovalDiscoveryInterval: number;
 };
 
 export const env: EnvironmentVariables = {
@@ -73,4 +80,11 @@ export const env: EnvironmentVariables = {
     [SEPOLIA_CHAIN_ID]: getInt(getEnvVar("SEPOLIA_BLOCK_OFFSET", "24")),
   },
   sharedWalletUsageCleanupInterval: getInt(getEnvVar("SHARED_WALLET_USAGE_CLEANUP_INTERVAL", "60")),
+  ovalDiscoveryInterval: getInt(getEnvVar("OVAL_DISCOVERY_INTERVAL", "180")),
+  standardCoinbaseFactory: getAddress(getEnvVar("STANDARD_COINBASE_FACTORY", "0x0e3d2b8220C0f74A287B85690a8cfeE5b45C2D44")),
+  standardChainlinkFactory: getAddress(getEnvVar("STANDARD_CHAINLINK_FACTORY", "0x6d0cbebdeBc5060E6264fcC497d5A277B5748Cf9")),
+  standardChronicleFactory: getAddress(getEnvVar("STANDARD_CHRONICLE_FACTORY", "0xE0225B5224512868814D9b10A14F705d99Ba0EdF")),
+  standardPythFactory: getAddress(getEnvVar("STANDARD_PYTH_FACTORY", "0x53A2a7C0cBb76B20782C6842A25876C5377B64e8")),
+  defaultRefundAddress: getAddress(getEnvVar("DEFAULT_REFUND_ADDRESS", "0x9Cc5b1bc0E1970D44B5Adc7ba51d76a5DD375434")),
+  defaultRefundPercent: getFloat(getEnvVar("DEFAULT_REFUND_PERCENT", fallback.refundPercent)),
 };

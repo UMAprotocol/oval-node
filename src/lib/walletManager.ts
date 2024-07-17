@@ -1,8 +1,9 @@
 import { JsonRpcProvider, Wallet, getAddress } from "ethers";
-import { OvalConfigs, OvalConfigsShared } from "./types";
-import { retrieveGckmsKey } from "./gckms";
+import { OvalDiscovery } from "./";
 import { env } from "./env";
+import { retrieveGckmsKey } from "./gckms";
 import { isMochaTest } from "./helpers";
+import { OvalConfigs, OvalConfigsShared } from "./types";
 
 type WalletConfig = {
     unlockerKey?: string;
@@ -18,6 +19,7 @@ type WalletUsed = {
 // WalletManager class to handle wallet operations.
 export class WalletManager {
     private static instance: WalletManager;
+    private ovalDiscovery: OvalDiscovery;
     private wallets: Record<string, Wallet> = {};
     private sharedWallets: Map<string, Wallet> = new Map();
     private sharedWalletUsage: Map<string, Array<WalletUsed>> = new Map();
@@ -25,6 +27,7 @@ export class WalletManager {
 
     private constructor(provider: JsonRpcProvider) {
         this.provider = provider;
+        this.ovalDiscovery = OvalDiscovery.getInstance();
         this.setupCleanupInterval();
     }
 
@@ -56,6 +59,9 @@ export class WalletManager {
 
     // Get a shared wallet for a given Oval instance and target block
     private getSharedWallet(ovalInstance: string, targetBlock: number): Wallet {
+        if (!this.ovalDiscovery.isOval(ovalInstance)) {
+            throw new Error(`Oval instance ${ovalInstance} is not found`);
+        }
         // Check if a wallet has already been assigned to this Oval instance
         if (this.sharedWalletUsage.has(ovalInstance)) {
             const previousAssignments = this.sharedWalletUsage.get(ovalInstance);

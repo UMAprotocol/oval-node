@@ -1,13 +1,14 @@
 import { Interface, Transaction, TransactionRequest, Wallet } from "ethers";
 import express from "express";
 import { FlashbotsBundleProvider } from "flashbots-ethers-v6-provider-bundle";
-import { getBaseFee, getMaxBlockByChainId, getProvider } from "./helpers";
+import { getBaseFee, getMaxBlockByChainId, getOvalRefundConfig, getProvider } from "./helpers";
 import { WalletManager } from "./walletManager";
 
 import MevShareClient, { BundleParams } from "@flashbots/mev-share-client";
 import { JSONRPCID, createJSONRPCSuccessResponse } from "json-rpc-2.0";
 
 import { ovalAbi } from "../abi";
+import { OvalDiscovery } from "./";
 import { env } from "./env";
 import { Logger } from "./logging";
 import { Refund } from "./types";
@@ -97,7 +98,7 @@ export const getUnlockBundlesFromOvalAddresses = async (
     // Construct the inner bundle with call to Oval to unlock the latest value.
     const unlockBundle = createUnlockLatestValueBundle(
       unlock.signedUnlockTx,
-      ovalConfigs[ovalAddress].refundAddress,
+      getOvalRefundConfig(ovalAddress).refundAddress,
       targetBlock,
     );
 
@@ -116,8 +117,10 @@ export const findUnlock = async (
   targetBlock: number,
   req: express.Request,
 ) => {
+  const factoryInstances = OvalDiscovery.getInstance().getOvalFactoryInstances();
+
   const unlocks = await Promise.all(
-    Object.keys(ovalConfigs).map(async (ovalAddress) =>
+    [...factoryInstances, ...Object.keys(ovalConfigs)].map(async (ovalAddress) =>
       prepareUnlockTransaction(flashbotsBundleProvider, backrunTxs, targetBlock, ovalAddress, req),
     ),
   );

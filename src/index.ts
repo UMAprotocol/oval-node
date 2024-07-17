@@ -34,6 +34,8 @@ import {
   isEthSendBundleParams,
   sendBundle,
   verifyBundleSignature,
+  getOvalRefundConfig,
+  OvalDiscovery
 } from "./lib";
 
 const app = express();
@@ -50,6 +52,10 @@ const { ovalConfigs, ovalConfigsShared } = env;
 // Initialize unlocker wallets for each Oval instance.
 const walletManager = WalletManager.getInstance(provider);
 walletManager.initialize(ovalConfigs, ovalConfigsShared);
+
+// Initialize Oval discovery
+const ovalDiscovery = OvalDiscovery.getInstance();
+ovalDiscovery.initialize(provider);
 
 // Start restful API server to listen for root inbound post requests.
 app.post("/", async (req, res, next) => {
@@ -167,7 +173,7 @@ app.post("/", async (req, res, next) => {
         // Construct the inner bundle with call to Oval to unlock the latest value.
         const unlockBundle = createUnlockLatestValueBundle(
           unlock.signedUnlockTx,
-          ovalConfigs[unlock.ovalAddress].refundAddress,
+          getOvalRefundConfig(unlock.ovalAddress).refundAddress,
           targetBlock,
         );
 

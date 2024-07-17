@@ -4,7 +4,9 @@ import { WalletManager } from '../src/lib/walletManager';
 import { JsonRpcProvider, Wallet } from 'ethers';
 import "../src/lib/express-extensions";
 import * as gckms from '../src/lib/gckms';
+import * as ovalDiscovery from '../src/lib/ovalDiscovery';
 import { OvalConfigs, OvalConfigsShared } from '../src/lib/types';
+
 
 const mockProvider = new JsonRpcProvider();
 
@@ -17,6 +19,14 @@ const getRandomAddressAndKey = () => {
 };
 
 describe('WalletManager Tests', () => {
+
+    beforeEach(() => {
+        const ovalDiscoveryInstance = {
+            isOval: sinon.stub().resolves(true),
+            findOval: sinon.stub().resolves()
+        };
+        sinon.stub(ovalDiscovery.OvalDiscovery, 'getInstance').returns(ovalDiscoveryInstance as any);
+    });
 
     afterEach(() => {
         sinon.restore();

@@ -13,10 +13,11 @@ import {
 import { Request } from "express";
 import { FlashbotsBundleProvider } from "flashbots-ethers-v6-provider-bundle";
 import { JSONRPCRequest } from "json-rpc-2.0";
+import { OvalDiscovery } from "./";
 import { flashbotsSupportedNetworks, supportedNetworks } from "./constants";
 import { env } from "./env";
 import { Logger } from "./logging";
-import { OvalAddressConfigList, OvalConfig, OvalConfigShared, OvalConfigs, OvalConfigsShared } from "./types";
+import { OvalAddressConfigList, OvalConfig, OvalConfigShared, OvalConfigs, OvalConfigsShared, RefundConfig } from "./types";
 
 export function getProvider() {
   const network = new Network(supportedNetworks[env.chainId], env.chainId);
@@ -278,6 +279,21 @@ export function getOvalConfigsShared(input: string): OvalConfigsShared {
   throw new Error(`Value "${input}" is valid JSON but is not OvalConfigsShared records`);
 }
 
+export const getOvalAddresses = (): string[] => {
+  const factoryInstances = OvalDiscovery.getInstance().getOvalFactoryInstances();
+  return [...factoryInstances, ...Object.keys(env.ovalConfigs)].map(getAddress);
+};
+
+export const getOvalRefundConfig = (ovalAddress: string): RefundConfig => {
+  if (env.ovalConfigs[ovalAddress]) {
+    return env.ovalConfigs[ovalAddress];
+  }
+  return {
+    refundAddress: getAddress(env.defaultRefundAddress),
+    refundPercent: env.defaultRefundPercent,
+  };
+};
+
 // Get OvalAddressConfigList from the header string or throw an error if the header is invalid.
 export const getOvalHeaderConfigs = (
   header: string | string[] | undefined,
@@ -292,10 +308,10 @@ export const getOvalHeaderConfigs = (
     }
     // Normalise addresses and check if they are valid Oval instances.
     const normalisedAddresses = ovalAddresses.map(getAddress);
-    if (normalisedAddresses.some((ovalAddress) => !ovalConfigs[ovalAddress])) {
+    if (normalisedAddresses.some((ovalAddress) => !getOvalAddresses().includes(ovalAddress))) {
       throw new Error(`Some addresses in "${header}" are not valid Oval instances`);
     }
-    const uniqueRefundAddresses = new Set(normalisedAddresses.map((address) => ovalConfigs[address].refundAddress));
+    const uniqueRefundAddresses = new Set(normalisedAddresses.map((address) => getOvalRefundConfig(address).refundAddress));
     if (uniqueRefundAddresses.size > 1) {
       throw new Error(`Value "${header}" only supports a single refund address`);
     }
