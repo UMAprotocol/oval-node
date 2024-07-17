@@ -36,7 +36,6 @@ export class OvalDiscovery {
     public static getInstance(): OvalDiscovery {
         if (!OvalDiscovery.instance) {
             OvalDiscovery.instance = new OvalDiscovery();
-            OvalDiscovery.instance.findOval(FACTORIES_GENESIS_BLOCK);
         }
         return OvalDiscovery.instance;
     }
