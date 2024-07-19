@@ -112,7 +112,7 @@ export class WalletManager {
 
     private async initializeWallets(configs: OvalConfigs): Promise<void> {
         for (const [address, config] of Object.entries(configs)) {
-            this.wallets[address] = await this.createWallet(config);
+            this.wallets[getAddress(address)] = await this.createWallet(config);
         }
     }
 
@@ -160,7 +160,7 @@ export class WalletManager {
             totalUsage.set(wallet.address, { totalCount: 0, ovalInstances: new Set() });
         });
 
-        // Sum usage counts for each wallet
+        // Sum usage counts for each wallet and collect all Oval instances
         this.sharedWalletUsage.forEach((instanceUsage) => {
             instanceUsage.forEach((record) => {
                 const totalInstanceUsage = totalUsage.get(record.walletPubKey)!;
@@ -175,6 +175,7 @@ export class WalletManager {
         let minUsage = Infinity;
         totalUsage.forEach((usage, walletPubKey) => {
             const instanceCount = usage.ovalInstances.size;
+            // If the wallet has been used in less Oval instances or the same number of instances but less total usage, select it
             if (instanceCount < minInstances || (instanceCount === minInstances && usage.totalCount < minUsage)) {
                 minInstances = instanceCount;
                 minUsage = usage.totalCount;
@@ -182,6 +183,8 @@ export class WalletManager {
             }
         });
 
+        // If we are allocating a wallet with an Oval instance already associated with another Oval instance in the last env.sharedWalletUsageCleanupInterval seconds,
+        // we should alert as this could cause nonce collisions between unlocks targeting different Oval instances.
         if (minInstances !== Infinity && minInstances !== 0) {
             Logger.error(transactionId, `Public key ${selectedWallet?.address} is reused in multiple Oval instances because no free wallets are available.`);
         }
@@ -207,6 +210,7 @@ export class WalletManager {
     private cleanupOldRecords(currentBlock: number): void {
         this.sharedWalletUsage.forEach((instanceUsage, ovalInstance) => {
             instanceUsage.forEach((_, blockNumber) => {
+                // Delete record older than current block as they are no longer relevant
                 if (blockNumber < currentBlock - 1) {
                     instanceUsage.delete(blockNumber);
                 }
