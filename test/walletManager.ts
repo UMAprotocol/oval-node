@@ -6,7 +6,9 @@ import "../src/lib/express-extensions";
 import * as gckms from '../src/lib/gckms';
 import * as ovalDiscovery from '../src/lib/ovalDiscovery';
 import * as logger from '../src/lib/logging';
+import { PermissionProxy__factory } from "../src/contract-types";
 import { OvalConfigs, OvalConfigsShared } from '../src/lib/types';
+import { env } from '../src/lib';
 
 
 const mockProvider = new JsonRpcProvider();
@@ -30,6 +32,10 @@ describe('WalletManager Tests', () => {
         // Cleanup old records
         WalletManager.getInstance()['cleanupOldRecords'](Infinity);
         WalletManager['instance'] = undefined as any;
+
+        sinon.stub(PermissionProxy__factory, 'connect').returns({
+            senders: sinon.stub().resolves(true)
+        } as any);
     });
 
     afterEach(() => {
