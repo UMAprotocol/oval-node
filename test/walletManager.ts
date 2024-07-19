@@ -26,6 +26,8 @@ describe('WalletManager Tests', () => {
             findOval: sinon.stub().resolves()
         };
         sinon.stub(ovalDiscovery.OvalDiscovery, 'getInstance').returns(ovalDiscoveryInstance as any);
+        // Cleanup old records
+        WalletManager.getInstance()['cleanupOldRecords'](Infinity);
     });
 
     afterEach(() => {
@@ -33,8 +35,8 @@ describe('WalletManager Tests', () => {
     });
 
     it('should return a singleton instance', () => {
-        const instance1 = WalletManager.getInstance(mockProvider);
-        const instance2 = WalletManager.getInstance(mockProvider);
+        const instance1 = WalletManager.getInstance();
+        const instance2 = WalletManager.getInstance();
         expect(instance1).to.equal(instance2);
     });
 
@@ -49,8 +51,8 @@ describe('WalletManager Tests', () => {
             [oval2]: { gckmsKeyId: 'gckmsKeyId456', refundAddress: refundRandom, refundPercent: 20 },
         };
         sinon.stub(gckms, 'retrieveGckmsKey').resolves(gckmsRandom.privateKey);
-        const walletManager = WalletManager.getInstance(mockProvider);
-        await walletManager.initialize(ovalConfigs);
+        const walletManager = WalletManager.getInstance();
+        await walletManager.initialize(mockProvider, ovalConfigs);
 
         const walletRandom = walletManager.getWallet(oval1, 123);
         expect(walletRandom?.privateKey).to.equal(unlockerRandom.privateKey);
@@ -67,8 +69,8 @@ describe('WalletManager Tests', () => {
             { gckmsKeyId: 'gckmsKeyId456' },
         ];
         sinon.stub(gckms, 'retrieveGckmsKey').resolves(gckmsRandom.privateKey);
-        const walletManager = WalletManager.getInstance(mockProvider);
-        await walletManager.initialize({}, sharedConfigs);
+        const walletManager = WalletManager.getInstance();
+        await walletManager.initialize(mockProvider, {}, sharedConfigs);
 
         // Check if shared wallets are initialized
         const sharedWallets = Array.from(walletManager['sharedWallets'].values());
@@ -80,11 +82,13 @@ describe('WalletManager Tests', () => {
         const sharedConfigs: OvalConfigsShared = [
             { unlockerKey: unlockerRandom.privateKey },
         ];
-        const walletManager = WalletManager.getInstance(mockProvider);
-        await walletManager.initialize({}, sharedConfigs);
+        const walletManager = WalletManager.getInstance();
+
+        await walletManager.initialize(mockProvider, {}, sharedConfigs);
 
         const ovalInstance = 'ovalInstance1';
         const targetBlock = 123;
+
 
         const wallet1 = await walletManager['getSharedWallet'](ovalInstance, targetBlock);
         const wallet2 = await walletManager['getSharedWallet'](ovalInstance, targetBlock + 1);
@@ -99,8 +103,8 @@ describe('WalletManager Tests', () => {
             { unlockerKey: unlockerRandom1.privateKey },
             { unlockerKey: unlockerRandom2.privateKey },
         ];
-        const walletManager = WalletManager.getInstance(mockProvider);
-        await walletManager.initialize({}, sharedConfigs);
+        const walletManager = WalletManager.getInstance();
+        await walletManager.initialize(mockProvider, {}, sharedConfigs);
 
         const ovalInstance1 = 'ovalInstance1';
         const ovalInstance2 = 'ovalInstance2';
@@ -118,8 +122,8 @@ describe('WalletManager Tests', () => {
         const sharedConfigs: OvalConfigsShared = [
             { unlockerKey: unlockerRandom.privateKey },
         ];
-        const walletManager = WalletManager.getInstance(mockProvider);
-        await walletManager.initialize({}, sharedConfigs);
+        const walletManager = WalletManager.getInstance();
+        await walletManager.initialize(mockProvider, {}, sharedConfigs);
 
         const ovalInstance = 'ovalInstance1';
         const targetBlock = 123;

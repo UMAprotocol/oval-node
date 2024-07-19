@@ -13,7 +13,7 @@ import {
 import { Request } from "express";
 import { FlashbotsBundleProvider } from "flashbots-ethers-v6-provider-bundle";
 import { JSONRPCRequest } from "json-rpc-2.0";
-import { OvalDiscovery } from "./";
+import { OvalDiscovery, WalletManager } from "./";
 import { flashbotsSupportedNetworks, supportedNetworks } from "./constants";
 import { env } from "./env";
 import { Logger } from "./logging";
@@ -281,7 +281,11 @@ export function getOvalConfigsShared(input: string): OvalConfigsShared {
 
 export const getOvalAddresses = (): string[] => {
   const factoryInstances = OvalDiscovery.getInstance().getOvalFactoryInstances();
-  return [...factoryInstances, ...Object.keys(env.ovalConfigs)].map(getAddress);
+  return [...Object.keys(env.ovalConfigs), ...factoryInstances].map(getAddress);
+};
+
+export const isOvalSharedUnlockerKey = (unlockerKey: string): boolean => {
+  return WalletManager.getInstance().isOvalSharedUnlocker(unlockerKey);
 };
 
 export const getOvalRefundConfig = (ovalAddress: string): RefundConfig => {

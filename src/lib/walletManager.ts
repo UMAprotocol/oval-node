@@ -11,8 +11,9 @@ type WalletConfig = {
 };
 
 type WalletUsed = {
-    walletPubKey: string;
     count: number;
+    walletPubKey: string;
+    ovalInstances: Set<string>;
 };
 
 // WalletManager class to handle wallet operations.
@@ -22,32 +23,35 @@ export class WalletManager {
     private wallets: Record<string, Wallet> = {};
     private sharedWallets: Map<string, Wallet> = new Map();
     private sharedWalletUsage: Map<string, Map<number, WalletUsed>> = new Map();
-    private provider: JsonRpcProvider;
+    private provider: JsonRpcProvider | undefined;
 
-    private constructor(provider: JsonRpcProvider) {
-        this.provider = provider;
+    private constructor() {
         this.ovalDiscovery = OvalDiscovery.getInstance();
-        this.setupCleanupInterval();
     }
 
     // Singleton pattern to get an instance of WalletManager
-    public static getInstance(provider: JsonRpcProvider): WalletManager {
+    public static getInstance(): WalletManager {
         if (!WalletManager.instance) {
-            WalletManager.instance = new WalletManager(provider);
+            WalletManager.instance = new WalletManager();
         }
         return WalletManager.instance;
     }
 
     // Initialize wallets with configurations
-    public async initialize(ovalConfigs: OvalConfigs, sharedConfigs?: OvalConfigsShared): Promise<void> {
+    public async initialize(provider: JsonRpcProvider, ovalConfigs: OvalConfigs, sharedConfigs?: OvalConfigsShared): Promise<void> {
+        this.provider = provider;
         await this.initializeWallets(ovalConfigs);
         if (sharedConfigs) {
             await this.initializeSharedWallets(sharedConfigs);
         }
+        this.setupCleanupInterval();
     }
 
     // Get a wallet for a given address
     public getWallet(address: string, targetBlock: number): Wallet {
+        if (!this.provider) {
+            throw new Error("Provider is not initialized");
+        }
         const checkSummedAddress = getAddress(address);
         const wallet = this.wallets[checkSummedAddress];
         if (!wallet) {
@@ -59,15 +63,20 @@ export class WalletManager {
 
     // Get a shared wallet for a given Oval instance and target block
     private getSharedWallet(ovalInstance: string, targetBlock: number): Wallet {
+        if (!this.provider) {
+            throw new Error("Provider is not initialized");
+        }
         if (!this.ovalDiscovery.isOval(ovalInstance)) {
             throw new Error(`Oval instance ${ovalInstance} is not found`);
         }
 
         // Check if a wallet has already been assigned to this Oval instance
-        const instanceUsage = this.sharedWalletUsage.get(ovalInstance);
-        if (instanceUsage) {
-            const [_, usage] = instanceUsage.entries().next().value;
-            return this.sharedWallets.get(usage.walletPubKey)!.connect(this.provider);
+        for (const [walletPubKey, instanceUsage] of this.sharedWalletUsage.entries()) {
+            for (const [block, record] of instanceUsage.entries()) {
+                if (record.ovalInstances && record.ovalInstances.has(ovalInstance)) {
+                    return this.sharedWallets.get(record.walletPubKey)!.connect(this.provider!);
+                }
+            }
         }
 
         // If no wallet has been assigned, find the least used wallet
@@ -80,10 +89,15 @@ export class WalletManager {
         throw new Error(`No available shared wallets for Oval instance ${ovalInstance} at block ${targetBlock}`);
     }
 
+    public isOvalSharedUnlocker(unlockerPublicKey: string): boolean {
+        return this.sharedWallets.has(unlockerPublicKey);
+    }
+
     // Private helper methods
     private setupCleanupInterval(): void {
-        if (isMochaTest()) return;
+        if (isMochaTest() || !this.provider) return;
         setInterval(async () => {
+            if (!this.provider) return;
             const currentBlock = await this.provider.getBlockNumber();
             this.cleanupOldRecords(currentBlock);
         }, env.sharedWalletUsageCleanupInterval * 1000);
@@ -101,7 +115,6 @@ export class WalletManager {
             if (wallet) {
                 const walletPubKey = await wallet.getAddress();
                 this.sharedWallets.set(walletPubKey, wallet);
-                this.sharedWalletUsage.set(walletPubKey, new Map());
             }
         }
     }
@@ -123,26 +136,34 @@ export class WalletManager {
 
     private findLeastUsedWallet(): Wallet | undefined {
         let selectedWallet: Wallet | undefined;
-        const usageCount = new Map<string, number>();
+        const totalUsage = new Map<string, {
+            totalCount: number;
+            ovalInstances: Set<string>;
+        }>();
 
-        // Initialize usage counts for each wallet
-        this.sharedWallets.forEach((_, walletPubKey) => {
-            usageCount.set(walletPubKey, 0);
+        // Initialize total usage counts for each wallet
+        this.sharedWallets.forEach((wallet) => {
+            totalUsage.set(wallet.address, { totalCount: 0, ovalInstances: new Set() });
         });
 
         // Sum usage counts for each wallet
         this.sharedWalletUsage.forEach((instanceUsage) => {
             instanceUsage.forEach((record) => {
-                const count = usageCount.get(record.walletPubKey) || 0;
-                usageCount.set(record.walletPubKey, count + record.count);
+                const totalInstanceUsage = totalUsage.get(record.walletPubKey)!;
+                totalInstanceUsage.totalCount += record.count;
+                record.ovalInstances.forEach(instance => totalInstanceUsage.ovalInstances.add(instance));
+                totalUsage.set(record.walletPubKey, totalInstanceUsage);
             });
         });
 
         // Find the wallet with the least usage
+        let minInstances = Infinity;
         let minUsage = Infinity;
-        usageCount.forEach((count, walletPubKey) => {
-            if (count < minUsage) {
-                minUsage = count;
+        totalUsage.forEach((usage, walletPubKey) => {
+            const instanceCount = usage.ovalInstances.size;
+            if (instanceCount < minInstances || (instanceCount === minInstances && usage.totalCount < minUsage)) {
+                minInstances = instanceCount;
+                minUsage = usage.totalCount;
                 selectedWallet = this.sharedWallets.get(walletPubKey);
             }
         });
@@ -152,16 +173,17 @@ export class WalletManager {
 
     private async updateWalletUsage(ovalInstance: string, wallet: Wallet, targetBlock: number): Promise<void> {
         const walletPubKey = await wallet.getAddress();
-        const instanceUsage = this.sharedWalletUsage.get(ovalInstance) || new Map();
+        const instanceUsage = this.sharedWalletUsage.get(walletPubKey) || new Map();
         const existingRecord = instanceUsage.get(targetBlock);
 
         if (existingRecord) {
-            existingRecord.count += 1;
+            (existingRecord as WalletUsed).count += 1;
+            (existingRecord as WalletUsed).ovalInstances.add(ovalInstance);
         } else {
-            instanceUsage.set(targetBlock, { walletPubKey, count: 1 });
+            instanceUsage.set(targetBlock, { walletPubKey, count: 1, ovalInstances: new Set([ovalInstance]) });
         }
 
-        this.sharedWalletUsage.set(ovalInstance, instanceUsage);
+        this.sharedWalletUsage.set(walletPubKey, instanceUsage);
     }
 
     private cleanupOldRecords(currentBlock: number): void {
