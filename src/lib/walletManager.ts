@@ -1,5 +1,5 @@
 import { JsonRpcProvider, Wallet, getAddress } from "ethers";
-import { OvalDiscovery } from "./";
+import { Logger, OvalDiscovery } from "./";
 import { env } from "./env";
 import { retrieveGckmsKey } from "./gckms";
 import { isMochaTest } from "./helpers";
@@ -48,21 +48,21 @@ export class WalletManager {
     }
 
     // Get a wallet for a given address
-    public getWallet(address: string, targetBlock: number): Wallet {
+    public getWallet(address: string, targetBlock: number, transactionId: string): Wallet {
         if (!this.provider) {
             throw new Error("Provider is not initialized");
         }
         const checkSummedAddress = getAddress(address);
         const wallet = this.wallets[checkSummedAddress];
         if (!wallet) {
-            return this.getSharedWallet(address, targetBlock);
+            return this.getSharedWallet(address, targetBlock, transactionId);
         }
         return wallet.connect(this.provider);
     }
 
 
     // Get a shared wallet for a given Oval instance and target block
-    private getSharedWallet(ovalInstance: string, targetBlock: number): Wallet {
+    private getSharedWallet(ovalInstance: string, targetBlock: number, transactionId: string): Wallet {
         if (!this.provider) {
             throw new Error("Provider is not initialized");
         }
@@ -70,17 +70,23 @@ export class WalletManager {
             throw new Error(`Oval instance ${ovalInstance} is not found`);
         }
 
+        let selectedWallet: Wallet | undefined;
+
         // Check if a wallet has already been assigned to this Oval instance
         for (const [walletPubKey, instanceUsage] of this.sharedWalletUsage.entries()) {
-            for (const [block, record] of instanceUsage.entries()) {
+            for (const [_, record] of instanceUsage.entries()) {
                 if (record.ovalInstances && record.ovalInstances.has(ovalInstance)) {
-                    return this.sharedWallets.get(record.walletPubKey)!.connect(this.provider!);
+                    selectedWallet = this.sharedWallets.get(walletPubKey)!.connect(this.provider!);
                 }
             }
         }
 
         // If no wallet has been assigned, find the least used wallet
-        const selectedWallet = this.findLeastUsedWallet();
+        if (!selectedWallet) {
+            selectedWallet = this.findLeastUsedWallet(transactionId);
+        }
+
+        // Update the usage of the selected wallet
         if (selectedWallet) {
             this.updateWalletUsage(ovalInstance, selectedWallet, targetBlock);
             return selectedWallet.connect(this.provider);
@@ -134,7 +140,7 @@ export class WalletManager {
         throw new Error('Invalid wallet configuration');
     }
 
-    private findLeastUsedWallet(): Wallet | undefined {
+    private findLeastUsedWallet(transactionId: string): Wallet | undefined {
         let selectedWallet: Wallet | undefined;
         const totalUsage = new Map<string, {
             totalCount: number;
@@ -167,6 +173,10 @@ export class WalletManager {
                 selectedWallet = this.sharedWallets.get(walletPubKey);
             }
         });
+
+        if (minInstances !== Infinity && minInstances !== 0) {
+            Logger.error(transactionId, `Public key ${selectedWallet?.address} is reused in multiple Oval instances because no free wallets are available.`);
+        }
 
         return selectedWallet;
     }

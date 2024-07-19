@@ -5,6 +5,7 @@ import { JsonRpcProvider, Wallet } from 'ethers';
 import "../src/lib/express-extensions";
 import * as gckms from '../src/lib/gckms';
 import * as ovalDiscovery from '../src/lib/ovalDiscovery';
+import * as logger from '../src/lib/logging';
 import { OvalConfigs, OvalConfigsShared } from '../src/lib/types';
 
 
@@ -28,6 +29,7 @@ describe('WalletManager Tests', () => {
         sinon.stub(ovalDiscovery.OvalDiscovery, 'getInstance').returns(ovalDiscoveryInstance as any);
         // Cleanup old records
         WalletManager.getInstance()['cleanupOldRecords'](Infinity);
+        WalletManager['instance'] = undefined as any;
     });
 
     afterEach(() => {
@@ -54,10 +56,10 @@ describe('WalletManager Tests', () => {
         const walletManager = WalletManager.getInstance();
         await walletManager.initialize(mockProvider, ovalConfigs);
 
-        const walletRandom = walletManager.getWallet(oval1, 123);
+        const walletRandom = walletManager.getWallet(oval1, 123, "transactionId");
         expect(walletRandom?.privateKey).to.equal(unlockerRandom.privateKey);
 
-        const walletGckms = walletManager.getWallet(oval2, 123);
+        const walletGckms = walletManager.getWallet(oval2, 123, "transactionId");
         expect(walletGckms?.privateKey).to.equal(gckmsRandom.privateKey);
     });
 
@@ -90,8 +92,8 @@ describe('WalletManager Tests', () => {
         const targetBlock = 123;
 
 
-        const wallet1 = await walletManager['getSharedWallet'](ovalInstance, targetBlock);
-        const wallet2 = await walletManager['getSharedWallet'](ovalInstance, targetBlock + 1);
+        const wallet1 = await walletManager['getSharedWallet'](ovalInstance, targetBlock, "transactionId");
+        const wallet2 = await walletManager['getSharedWallet'](ovalInstance, targetBlock + 1, "transactionId");
 
         expect(wallet1.address).to.equal(wallet2.address);
     });
@@ -99,6 +101,7 @@ describe('WalletManager Tests', () => {
     it('should assign the least used shared wallet when no previous assignment exists', async () => {
         const unlockerRandom1 = getRandomAddressAndKey();
         const unlockerRandom2 = getRandomAddressAndKey();
+
         const sharedConfigs: OvalConfigsShared = [
             { unlockerKey: unlockerRandom1.privateKey },
             { unlockerKey: unlockerRandom2.privateKey },
@@ -108,13 +111,28 @@ describe('WalletManager Tests', () => {
 
         const ovalInstance1 = 'ovalInstance1';
         const ovalInstance2 = 'ovalInstance2';
+        const ovalInstance3 = 'ovalInstance3';
         const targetBlock = 123;
 
-        const wallet1 = await walletManager['getSharedWallet'](ovalInstance1, targetBlock);
-        const wallet2 = await walletManager['getSharedWallet'](ovalInstance2, targetBlock);
+        const wallet1 = await walletManager['getSharedWallet'](ovalInstance1, targetBlock, "transactionId");
+        await walletManager['getSharedWallet'](ovalInstance1, targetBlock, "transactionId");
+
+        const walletUsageOne = walletManager['sharedWalletUsage']?.get(wallet1.address)?.get(targetBlock)
+        expect(walletUsageOne?.count).to.equal(2);
+        expect(walletUsageOne?.ovalInstances.size).to.equal(1);
+
+        const wallet2 = await walletManager['getSharedWallet'](ovalInstance2, targetBlock, "transactionId");
 
         // As these are the first assignments, wallet1 and wallet2 should be different
         expect(wallet1.address).to.not.equal(wallet2.address);
+
+        const errorSpy = sinon.spy(logger.Logger, 'error'); // Create a spy on logger.Logger.error
+
+        const wallet3 = await walletManager['getSharedWallet'](ovalInstance3, targetBlock, "transactionId");
+        expect(wallet3.address).to.equal(wallet2.address);
+
+        expect(errorSpy.calledOnce).to.be.true;
+        expect(errorSpy.args[0][1]).to.include(`Public key ${wallet2.address} is reused in multiple Oval instances because no free wallets are available.`);
     });
 
     it('should cleanup old records correctly', async () => {
@@ -128,7 +146,7 @@ describe('WalletManager Tests', () => {
         const ovalInstance = 'ovalInstance1';
         const targetBlock = 123;
 
-        await walletManager['getSharedWallet'](ovalInstance, targetBlock);
+        await walletManager['getSharedWallet'](ovalInstance, targetBlock, "transactionId");
 
         walletManager['cleanupOldRecords'](targetBlock + 2);
 
