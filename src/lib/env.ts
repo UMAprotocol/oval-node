@@ -54,6 +54,7 @@ type EnvironmentVariables = {
   standardChainlinkFactory: string;
   standardChronicleFactory: string;
   standardPythFactory: string;
+  permissionProxyAddress: string;
   defaultRefundAddress: string;
   defaultRefundPercent: number;
   ovalDiscoveryInterval: number;
@@ -85,6 +86,7 @@ export const env: EnvironmentVariables = {
   standardChainlinkFactory: getAddress(getEnvVar("STANDARD_CHAINLINK_FACTORY", "0x6d0cbebdeBc5060E6264fcC497d5A277B5748Cf9")),
   standardChronicleFactory: getAddress(getEnvVar("STANDARD_CHRONICLE_FACTORY", "0xE0225B5224512868814D9b10A14F705d99Ba0EdF")),
   standardPythFactory: getAddress(getEnvVar("STANDARD_PYTH_FACTORY", "0x53A2a7C0cBb76B20782C6842A25876C5377B64e8")),
+  permissionProxyAddress: getAddress(getEnvVar("PERMISSION_PROXY_ADDRESS", "0xb9b7584ea2f605182f73b8c63f116cb3f17086b5")),
   defaultRefundAddress: getAddress(getEnvVar("DEFAULT_REFUND_ADDRESS", "0x9Cc5b1bc0E1970D44B5Adc7ba51d76a5DD375434")),
   defaultRefundPercent: getFloat(getEnvVar("DEFAULT_REFUND_PERCENT", fallback.refundPercent)),
 };

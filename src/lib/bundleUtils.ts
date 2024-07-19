@@ -1,18 +1,17 @@
 import { Interface, Transaction, TransactionRequest, Wallet } from "ethers";
 import express from "express";
 import { FlashbotsBundleProvider } from "flashbots-ethers-v6-provider-bundle";
-import { getBaseFee, getMaxBlockByChainId, getOvalAddresses, getOvalRefundConfig, getProvider } from "./helpers";
+import { getBaseFee, getMaxBlockByChainId, getOvalAddresses, getOvalRefundConfig, getProvider, isOvalSharedUnlockerKey } from "./helpers";
 import { WalletManager } from "./walletManager";
 
 import MevShareClient, { BundleParams } from "@flashbots/mev-share-client";
 import { JSONRPCID, createJSONRPCSuccessResponse } from "json-rpc-2.0";
 
 import { ovalAbi } from "../abi";
-import { OvalDiscovery } from "./";
 import { env } from "./env";
 import { Logger } from "./logging";
 import { Refund } from "./types";
-const { ovalConfigs } = env;
+import { PermissionProxy__factory } from "../contract-types";
 
 export const ovalInterface = Interface.from(ovalAbi);
 
@@ -21,7 +20,7 @@ export const createUnlockLatestValueTx = async (
   baseFee: bigint,
   data: string,
   chainId: bigint,
-  ovalAddress: string,
+  target: string,
 ) => {
   const nonce = await wallet.getNonce();
 
@@ -29,7 +28,7 @@ export const createUnlockLatestValueTx = async (
   const unlockTx: TransactionRequest = {
     type: 2,
     chainId,
-    to: ovalAddress,
+    to: target,
     nonce,
     value: 0,
     gasLimit: 200000,
@@ -57,15 +56,24 @@ export const prepareUnlockTransaction = async (
   simulate = true,
 ) => {
   const provider = getProvider();
-  const unlockerWallet = WalletManager.getInstance().getWallet(ovalAddress, targetBlock, req.transactionId);
   const [baseFee, network] = await Promise.all([getBaseFee(provider, req), provider.getNetwork()]);
-  const data = ovalInterface.encodeFunctionData("unlockLatestValue");
+  const unlockerWallet = WalletManager.getInstance().getWallet(ovalAddress, targetBlock, req.transactionId);
+  const isSharedWallet = isOvalSharedUnlockerKey(unlockerWallet.address);
+
+  // Encode the unlockLatestValue function call depending on whether the unlocker is a shared wallet or not.
+  let data = ovalInterface.encodeFunctionData("unlockLatestValue");
+  let target = ovalAddress;
+  if (isSharedWallet) {
+    target = env.permissionProxyAddress;
+    data = PermissionProxy__factory.createInterface().encodeFunctionData("execute", [target, data]);
+  }
+
   const { unlockTxHash, signedUnlockTx } = await createUnlockLatestValueTx(
     unlockerWallet,
     baseFee,
     data,
     network.chainId,
-    ovalAddress,
+    target,
   );
 
   if (!simulate) return { ovalAddress, unlockTxHash, signedUnlockTx };
