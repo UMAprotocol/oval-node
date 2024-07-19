@@ -14,6 +14,7 @@ import { StandardChronicleFactory__factory } from "../contract-types/factories/S
 import { StandardPythFactory } from "../contract-types/StandardPythFactory";
 import { StandardPythFactory__factory } from "../contract-types/factories/StandardPythFactory__factory";
 import { FACTORIES_GENESIS_BLOCK } from "./constants";
+import { Logger } from "./";
 
 // Singleton class to discover Oval instances
 export class OvalDiscovery {
@@ -49,7 +50,6 @@ export class OvalDiscovery {
     public async findOval(fromBlock: number) {
         if (!this.provider) return;
         const lastBlock = await this.provider.getBlockNumber();
-
         const factories = [this.standardCoinbaseFactory, this.standardChainlinkFactory, this.standardChronicleFactory, this.standardPythFactory];
 
         for (const factory of factories) {
@@ -61,6 +61,7 @@ export class OvalDiscovery {
             const ovalDeployments = await paginatedEventQuery(factory.connect(this.provider), factory.filters.OvalDeployed(undefined, undefined, undefined, undefined, undefined, undefined), searchConfig);
 
             ovalDeployments.forEach((ovalDeployment: EventLog) => {
+                Logger.debug("OvalDiscovery", `Found Oval deployment: ${ovalDeployment.args[1]}`);
                 this.ovalInstances.add(getAddress(ovalDeployment.args[1]));
             });
         }

@@ -65,7 +65,7 @@ export const prepareUnlockTransaction = async (
   let target = ovalAddress;
   if (isSharedWallet) {
     target = env.permissionProxyAddress;
-    data = PermissionProxy__factory.createInterface().encodeFunctionData("execute", [target, data]);
+    data = PermissionProxy__factory.createInterface().encodeFunctionData("execute", [ovalAddress, data]);
   }
 
   const { unlockTxHash, signedUnlockTx } = await createUnlockLatestValueTx(
