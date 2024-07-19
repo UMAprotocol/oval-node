@@ -50,8 +50,8 @@ const provider = getProvider();
 const { ovalConfigs, ovalConfigsShared } = env;
 
 // Initialize unlocker wallets for each Oval instance.
-const walletManager = WalletManager.getInstance(provider);
-walletManager.initialize(ovalConfigs, ovalConfigsShared);
+const walletManager = WalletManager.getInstance();
+walletManager.initialize(provider, ovalConfigs, ovalConfigsShared);
 
 // Initialize Oval discovery
 const ovalDiscovery = OvalDiscovery.getInstance();

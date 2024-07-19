@@ -4,6 +4,7 @@ import { env } from "./env";
 import { retrieveGckmsKey } from "./gckms";
 import { isMochaTest } from "./helpers";
 import { OvalConfigs, OvalConfigsShared } from "./types";
+import { PermissionProxy__factory } from "../contract-types";
 
 type WalletConfig = {
     unlockerKey?: string;
@@ -120,6 +121,13 @@ export class WalletManager {
             const wallet = await this.createWallet(config);
             if (wallet) {
                 const walletPubKey = await wallet.getAddress();
+
+                // Check if the wallet is a sender in the PermissionProxy contract.
+                const isSender = await PermissionProxy__factory.connect(env.permissionProxyAddress, this.provider!).senders(wallet.address);
+                if (!isSender) {
+                    throw new Error(`Wallet ${wallet.address} is not a sender in the PermissionProxy contract.`);
+                }
+
                 this.sharedWallets.set(walletPubKey, wallet);
             }
         }
