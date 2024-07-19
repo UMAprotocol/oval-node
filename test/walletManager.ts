@@ -88,12 +88,12 @@ describe('WalletManager Tests', () => {
 
         await walletManager.initialize(mockProvider, {}, sharedConfigs);
 
-        const ovalInstance = 'ovalInstance1';
+        const ovalInstance = getRandomAddressAndKey().address;
         const targetBlock = 123;
 
 
-        const wallet1 = await walletManager['getSharedWallet'](ovalInstance, targetBlock, "transactionId");
-        const wallet2 = await walletManager['getSharedWallet'](ovalInstance, targetBlock + 1, "transactionId");
+        const wallet1 = await walletManager.getWallet(ovalInstance, targetBlock, "transactionId");
+        const wallet2 = await walletManager.getWallet(ovalInstance, targetBlock + 1, "transactionId");
 
         expect(wallet1.address).to.equal(wallet2.address);
     });
@@ -109,26 +109,26 @@ describe('WalletManager Tests', () => {
         const walletManager = WalletManager.getInstance();
         await walletManager.initialize(mockProvider, {}, sharedConfigs);
 
-        const ovalInstance1 = 'ovalInstance1';
-        const ovalInstance2 = 'ovalInstance2';
-        const ovalInstance3 = 'ovalInstance3';
+        const ovalInstance1 = getRandomAddressAndKey().address;
+        const ovalInstance2 = getRandomAddressAndKey().address;
+        const ovalInstance3 = getRandomAddressAndKey().address;
         const targetBlock = 123;
 
-        const wallet1 = await walletManager['getSharedWallet'](ovalInstance1, targetBlock, "transactionId");
-        await walletManager['getSharedWallet'](ovalInstance1, targetBlock, "transactionId");
+        const wallet1 = walletManager.getWallet(ovalInstance1, targetBlock, "transactionId");
+        await walletManager.getWallet(ovalInstance1, targetBlock, "transactionId");
 
         const walletUsageOne = walletManager['sharedWalletUsage']?.get(wallet1.address)?.get(targetBlock)
         expect(walletUsageOne?.count).to.equal(2);
         expect(walletUsageOne?.ovalInstances.size).to.equal(1);
 
-        const wallet2 = await walletManager['getSharedWallet'](ovalInstance2, targetBlock, "transactionId");
+        const wallet2 = await walletManager.getWallet(ovalInstance2, targetBlock, "transactionId");
 
         // As these are the first assignments, wallet1 and wallet2 should be different
         expect(wallet1.address).to.not.equal(wallet2.address);
 
         const errorSpy = sinon.spy(logger.Logger, 'error'); // Create a spy on logger.Logger.error
 
-        const wallet3 = await walletManager['getSharedWallet'](ovalInstance3, targetBlock, "transactionId");
+        const wallet3 = await walletManager.getWallet(ovalInstance3, targetBlock, "transactionId");
         expect(wallet3.address).to.equal(wallet2.address);
 
         expect(errorSpy.calledOnce).to.be.true;
@@ -143,10 +143,10 @@ describe('WalletManager Tests', () => {
         const walletManager = WalletManager.getInstance();
         await walletManager.initialize(mockProvider, {}, sharedConfigs);
 
-        const ovalInstance = 'ovalInstance1';
+        const ovalInstance = getRandomAddressAndKey().address;
         const targetBlock = 123;
 
-        await walletManager['getSharedWallet'](ovalInstance, targetBlock, "transactionId");
+        await walletManager.getWallet(ovalInstance, targetBlock, "transactionId");
 
         walletManager['cleanupOldRecords'](targetBlock + 2);
 
