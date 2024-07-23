@@ -49,26 +49,32 @@ export class OvalDiscovery {
 
     public async updateInstances(fromBlock: number) {
         if (!this.provider) return;
-        const lastBlock = await this.provider.getBlockNumber();
-        const factories = [this.standardCoinbaseFactory, this.standardChainlinkFactory, this.standardChronicleFactory, this.standardPythFactory];
+        let lastBlock = fromBlock;
+        try {
+            lastBlock = await this.provider.getBlockNumber();
+            const factories = [this.standardCoinbaseFactory, this.standardChainlinkFactory, this.standardChronicleFactory, this.standardPythFactory];
 
-        for (const factory of factories) {
-            const searchConfig: EventSearchConfig = {
-                fromBlock,
-                toBlock: lastBlock,
-                maxBlockLookBack: 20000
-            };
-            const ovalDeployments = await paginatedEventQuery(factory.connect(this.provider), factory.filters.OvalDeployed(undefined, undefined, undefined, undefined, undefined, undefined), searchConfig);
+            for (const factory of factories) {
+                const searchConfig: EventSearchConfig = {
+                    fromBlock,
+                    toBlock: lastBlock,
+                    maxBlockLookBack: 20000
+                };
+                const ovalDeployments = await paginatedEventQuery(factory.connect(this.provider), factory.filters.OvalDeployed(undefined, undefined, undefined, undefined, undefined, undefined), searchConfig);
 
-            ovalDeployments.forEach((ovalDeployment: EventLog) => {
-                Logger.debug("OvalDiscovery", `Found Oval deployment: ${ovalDeployment.args[1]}`);
-                this.ovalInstances.add(getAddress(ovalDeployment.args[1]));
-            });
+                ovalDeployments.forEach((ovalDeployment: EventLog) => {
+                    Logger.debug("OvalDiscovery", `Found Oval deployment: ${ovalDeployment.args[1]}`);
+                    this.ovalInstances.add(getAddress(ovalDeployment.args[1]));
+                });
+            }
+        } catch (error) {
+            Logger.error("OvalDiscovery", `Error updating instances: ${error}`);
         }
 
         setTimeout(() => {
             this.updateInstances(lastBlock);
         }, env.ovalDiscoveryInterval * 1000);
+
     }
 
     public getOvalFactoryInstances(): Array<string> {
