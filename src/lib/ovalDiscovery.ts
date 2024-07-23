@@ -44,10 +44,10 @@ export class OvalDiscovery {
     public async initialize(provider: JsonRpcProvider) {
         if (this.provider) return;
         this.provider = provider;
-        this.findOval(FACTORIES_GENESIS_BLOCK);
+        this.updateInstances(FACTORIES_GENESIS_BLOCK);
     }
 
-    public async findOval(fromBlock: number) {
+    public async updateInstances(fromBlock: number) {
         if (!this.provider) return;
         const lastBlock = await this.provider.getBlockNumber();
         const factories = [this.standardCoinbaseFactory, this.standardChainlinkFactory, this.standardChronicleFactory, this.standardPythFactory];
@@ -67,7 +67,7 @@ export class OvalDiscovery {
         }
 
         setTimeout(() => {
-            this.findOval(lastBlock);
+            this.updateInstances(lastBlock);
         }, env.ovalDiscoveryInterval * 1000);
     }
 

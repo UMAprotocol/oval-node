@@ -61,7 +61,6 @@ export class WalletManager {
         return wallet.connect(this.provider);
     }
 
-
     // Get a shared wallet for a given Oval instance and target block
     private getSharedWallet(ovalInstance: string, targetBlock: number, transactionId: string): Wallet {
         if (!this.provider) {
@@ -110,12 +109,14 @@ export class WalletManager {
         }, env.sharedWalletUsageCleanupInterval * 1000);
     }
 
+    // Initialize regular wallets
     private async initializeWallets(configs: OvalConfigs): Promise<void> {
         for (const [address, config] of Object.entries(configs)) {
             this.wallets[getAddress(address)] = await this.createWallet(config);
         }
     }
 
+    // Initialize shared wallets
     private async initializeSharedWallets(configs: OvalConfigsShared): Promise<void> {
         for (const config of configs) {
             const wallet = await this.createWallet(config);
@@ -133,6 +134,7 @@ export class WalletManager {
         }
     }
 
+    // Create a wallet based on configuration
     private async createWallet(config: WalletConfig): Promise<Wallet> {
         if (config.unlockerKey) {
             return new Wallet(config.unlockerKey);
@@ -148,6 +150,7 @@ export class WalletManager {
         throw new Error('Invalid wallet configuration');
     }
 
+    // Find the least used wallet to avoid nonce collisions
     private findLeastUsedWallet(transactionId: string): Wallet | undefined {
         let selectedWallet: Wallet | undefined;
         const totalUsage = new Map<string, {
@@ -183,8 +186,7 @@ export class WalletManager {
             }
         });
 
-        // If we are allocating a wallet with an Oval instance already associated with another Oval instance in the last env.sharedWalletUsageCleanupInterval seconds,
-        // we should alert as this could cause nonce collisions between unlocks targeting different Oval instances.
+        // Log an error if a wallet is reused across multiple Oval instances
         if (minInstances !== Infinity && minInstances !== 0) {
             Logger.error(transactionId, `Public key ${selectedWallet?.address} is reused in multiple Oval instances because no free wallets are available.`);
         }
@@ -192,6 +194,7 @@ export class WalletManager {
         return selectedWallet;
     }
 
+    // Update the usage statistics for a wallet
     private async updateWalletUsage(ovalInstance: string, wallet: Wallet, targetBlock: number): Promise<void> {
         const walletPubKey = await wallet.getAddress();
         const instanceUsage = this.sharedWalletUsage.get(walletPubKey) || new Map();
@@ -207,6 +210,7 @@ export class WalletManager {
         this.sharedWalletUsage.set(walletPubKey, instanceUsage);
     }
 
+    // Cleanup old usage records that are no longer relevant
     private cleanupOldRecords(currentBlock: number): void {
         this.sharedWalletUsage.forEach((instanceUsage, ovalInstance) => {
             instanceUsage.forEach((_, blockNumber) => {

@@ -26,7 +26,7 @@ describe('WalletManager Tests', () => {
     beforeEach(() => {
         const ovalDiscoveryInstance = {
             isOval: sinon.stub().resolves(true),
-            findOval: sinon.stub().resolves()
+            updateInstances: sinon.stub().resolves()
         };
         sinon.stub(ovalDiscovery.OvalDiscovery, 'getInstance').returns(ovalDiscoveryInstance as any);
         // Cleanup old records
