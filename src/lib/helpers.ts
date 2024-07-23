@@ -176,14 +176,12 @@ function isOvalConfig(input: unknown): input is OvalConfig {
     typeof input === "object" &&
     input !== null &&
     !Array.isArray(input) &&
-    (
-      ("unlockerKey" in input && typeof input["unlockerKey"] === "string" &&
-        ((!input["unlockerKey"].startsWith("0x") && isHexString("0x" + input["unlockerKey"], 32)) ||
-          isHexString(input["unlockerKey"], 32)) &&
-        !("gckmsKeyId" in input)) ||
-      ("gckmsKeyId" in input && typeof input["gckmsKeyId"] === "string" &&
-        !("unlockerKey" in input))
-    ) &&
+    (("unlockerKey" in input &&
+      typeof input["unlockerKey"] === "string" &&
+      ((!input["unlockerKey"].startsWith("0x") && isHexString("0x" + input["unlockerKey"], 32)) ||
+        isHexString(input["unlockerKey"], 32)) &&
+      !("gckmsKeyId" in input)) ||
+      ("gckmsKeyId" in input && typeof input["gckmsKeyId"] === "string" && !("unlockerKey" in input))) &&
     "refundAddress" in input &&
     typeof input["refundAddress"] === "string" &&
     isAddress(input["refundAddress"]) &&
@@ -204,7 +202,8 @@ function isOvalConfigs(input: unknown): input is OvalConfigs {
     Object.keys(input).length === new Set(Object.keys(input)).size &&
     Object.keys(input).every((key) => isAddress(key)) &&
     Object.values(input).every((value) => isOvalConfig(value)) &&
-    Object.values(input).length === new Set(Object.values(input).map((value) => value.unlockerKey || value.gckmsKeyId)).size
+    Object.values(input).length ===
+    new Set(Object.values(input).map((value) => value.unlockerKey || value.gckmsKeyId)).size
   );
 }
 
@@ -344,8 +343,23 @@ export function verifyBundleSignature(
     return null;
   }
 
-  const bundleSignaturePublicKey = xFlashbotsSignatureHeader.split(":")[0];
-  const bundleSignedMessage = xFlashbotsSignatureHeader.split(":")[1];
+  const xFlashbotsSignatureHeaderParts = xFlashbotsSignatureHeader.split(":");
+  if (xFlashbotsSignatureHeaderParts.length !== 2) {
+    Logger.debug(
+      req.transactionId,
+      `Invalid signature header: ${xFlashbotsSignatureHeader}, expected address and signature separated by a colon`,
+    );
+    return null;
+  }
+
+  const bundleSignaturePublicKey = xFlashbotsSignatureHeaderParts[0];
+  if (!isAddress(bundleSignaturePublicKey)) {
+    Logger.debug(req.transactionId, `Invalid signature header: ${xFlashbotsSignatureHeader}, expected valid address`);
+    return null;
+  }
+  const bundleSignatureAddress = getAddress(bundleSignaturePublicKey);
+
+  const bundleSignedMessage = xFlashbotsSignatureHeaderParts[1];
 
   const serializedBody = JSON.stringify(body);
 
@@ -353,7 +367,7 @@ export function verifyBundleSignature(
 
   const recoveredAddress = ethers.verifyMessage(hash, bundleSignedMessage);
 
-  const verified = recoveredAddress === bundleSignaturePublicKey;
+  const verified = recoveredAddress === bundleSignatureAddress;
 
   return verified ? recoveredAddress : null;
 }
