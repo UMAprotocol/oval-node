@@ -64,3 +64,5 @@ export const flashbotsSupportedNetworks: {
 export const FLASHBOTS_SIGNATURE_HEADER = "x-flashbots-signature";
 
 export const OVAL_ADDRESSES_HEADER = "x-oval-addresses";
+
+export const FACTORIES_GENESIS_BLOCK = 20268518;

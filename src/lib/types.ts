@@ -1,12 +1,20 @@
-export interface OvalConfig {
-  unlockerKey?: string;
-  gckmsKeyId?: string;
+export interface RefundConfig {
   refundAddress: string;
   refundPercent: number;
 }
 
+export interface OvalConfigShared {
+  unlockerKey?: string;
+  gckmsKeyId?: string;
+}
+
+export interface OvalConfig extends OvalConfigShared, RefundConfig { }
+
 // Records to store supported Oval instances and their configs.
 export type OvalConfigs = Record<string, OvalConfig>;
+
+// Shared Oval configs
+export type OvalConfigsShared = Array<OvalConfigShared>;
 
 export type Refund = {
   bodyIdx: number;
