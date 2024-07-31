@@ -7,13 +7,12 @@ import { WalletManager } from "./walletManager";
 import MevShareClient, { BundleParams } from "@flashbots/mev-share-client";
 import { JSONRPCID, createJSONRPCSuccessResponse } from "json-rpc-2.0";
 
-import { ovalAbi } from "../abi";
 import { env } from "./env";
 import { Logger } from "./logging";
 import { Refund } from "./types";
-import { PermissionProxy__factory } from "../contract-types";
+import { Oval__factory, PermissionProxy__factory } from "../contract-types";
 
-export const ovalInterface = Interface.from(ovalAbi);
+export const ovalInterface = Oval__factory.createInterface();
 
 export const createUnlockLatestValueTx = async (
   wallet: Wallet,
