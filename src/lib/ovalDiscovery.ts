@@ -44,6 +44,7 @@ export class OvalDiscovery {
     public async initialize(provider: JsonRpcProvider) {
         if (this.provider) return;
         this.provider = provider;
+        Logger.debug("OvalDiscovery", `Updating instances from factories genesis block (${FACTORIES_GENESIS_BLOCK})`);
         this.updateInstances(FACTORIES_GENESIS_BLOCK);
     }
 
