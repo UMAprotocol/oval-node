@@ -299,8 +299,7 @@ export const getOvalRefundConfig = (ovalAddress: string): RefundConfig => {
 
 // Get OvalAddressConfigList from the header string or throw an error if the header is invalid.
 export const getOvalHeaderConfigs = (
-  header: string | string[] | undefined,
-  ovalConfigs: OvalConfigs,
+  header: string | string[] | undefined
 ): { errorMessage?: string; ovalAddresses: OvalAddressConfigList | undefined } => {
   if (!header) return { ovalAddresses: undefined };
   if (typeof header !== "string") return { ovalAddresses: undefined };

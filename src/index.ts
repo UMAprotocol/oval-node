@@ -73,8 +73,7 @@ app.post("/", async (req, res, next) => {
 
     // Get Oval header configs if present.
     const { ovalAddresses: headerOvalAddresses, errorMessage } = getOvalHeaderConfigs(
-      req.headers[OVAL_ADDRESSES_HEADER],
-      ovalConfigs,
+      req.headers[OVAL_ADDRESSES_HEADER]
     );
     if (errorMessage) {
       await handleUnsupportedRequest(req, res, "Error parsing Oval header configs: " + errorMessage);
@@ -128,7 +127,7 @@ app.post("/", async (req, res, next) => {
           {
             bodyIdx: 0,
             // Next line is dependent on all Oval addresses having the same refund address
-            percent: ovalConfigs[headerOvalAddresses[0]].refundPercent,
+            percent: getOvalRefundConfig(headerOvalAddresses[0]).refundPercent,
           },
         ];
 
@@ -157,7 +156,7 @@ app.post("/", async (req, res, next) => {
         // costs exceed refund value.
         const adjustedRefundPercent = adjustRefundPercent(
           unlock.simulationResponse.coinbaseDiff,
-          ovalConfigs[unlock.ovalAddress].refundPercent,
+          getOvalRefundConfig(unlock.ovalAddress).refundPercent,
         );
         if (adjustedRefundPercent <= 0) {
           Logger.debug(req.transactionId, `Insufficient builder payment ${unlock.simulationResponse.coinbaseDiff}`);
