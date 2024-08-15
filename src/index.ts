@@ -34,6 +34,8 @@ import {
   isEthSendBundleParams,
   sendBundle,
   verifyBundleSignature,
+  getOvalRefundConfig,
+  OvalDiscovery
 } from "./lib";
 
 const app = express();
@@ -45,11 +47,15 @@ app.use((req, res, next) => {
 });
 
 const provider = getProvider();
-const { ovalConfigs } = env;
+const { ovalConfigs, ovalConfigsShared } = env;
 
 // Initialize unlocker wallets for each Oval instance.
-const keyManager = WalletManager.getInstance();
-keyManager.initialize(ovalConfigs);
+const walletManager = WalletManager.getInstance();
+walletManager.initialize(provider, ovalConfigs, ovalConfigsShared);
+
+// Initialize Oval discovery
+const ovalDiscovery = OvalDiscovery.getInstance();
+ovalDiscovery.initialize(provider);
 
 // Start restful API server to listen for root inbound post requests.
 app.post("/", async (req, res, next) => {
@@ -67,8 +73,7 @@ app.post("/", async (req, res, next) => {
 
     // Get Oval header configs if present.
     const { ovalAddresses: headerOvalAddresses, errorMessage } = getOvalHeaderConfigs(
-      req.headers[OVAL_ADDRESSES_HEADER],
-      ovalConfigs,
+      req.headers[OVAL_ADDRESSES_HEADER]
     );
     if (errorMessage) {
       await handleUnsupportedRequest(req, res, "Error parsing Oval header configs: " + errorMessage);
@@ -122,7 +127,7 @@ app.post("/", async (req, res, next) => {
           {
             bodyIdx: 0,
             // Next line is dependent on all Oval addresses having the same refund address
-            percent: ovalConfigs[headerOvalAddresses[0]].refundPercent,
+            percent: getOvalRefundConfig(headerOvalAddresses[0]).refundPercent,
           },
         ];
 
@@ -151,7 +156,7 @@ app.post("/", async (req, res, next) => {
         // costs exceed refund value.
         const adjustedRefundPercent = adjustRefundPercent(
           unlock.simulationResponse.coinbaseDiff,
-          ovalConfigs[unlock.ovalAddress].refundPercent,
+          getOvalRefundConfig(unlock.ovalAddress).refundPercent,
         );
         if (adjustedRefundPercent <= 0) {
           Logger.debug(req.transactionId, `Insufficient builder payment ${unlock.simulationResponse.coinbaseDiff}`);
@@ -167,7 +172,7 @@ app.post("/", async (req, res, next) => {
         // Construct the inner bundle with call to Oval to unlock the latest value.
         const unlockBundle = createUnlockLatestValueBundle(
           unlock.signedUnlockTx,
-          ovalConfigs[unlock.ovalAddress].refundAddress,
+          getOvalRefundConfig(unlock.ovalAddress).refundAddress,
           targetBlock,
         );
 

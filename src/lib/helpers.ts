@@ -13,11 +13,11 @@ import {
 import { Request } from "express";
 import { FlashbotsBundleProvider } from "flashbots-ethers-v6-provider-bundle";
 import { JSONRPCRequest } from "json-rpc-2.0";
+import { OvalDiscovery, WalletManager } from "./";
 import { flashbotsSupportedNetworks, supportedNetworks } from "./constants";
 import { env } from "./env";
 import { Logger } from "./logging";
-import { OvalAddressConfigList, OvalConfig, OvalConfigs } from "./types";
-import { retrieveGckmsKey } from "./gckms";
+import { OvalAddressConfigList, OvalConfig, OvalConfigShared, OvalConfigs, OvalConfigsShared, RefundConfig } from "./types";
 
 export function getProvider() {
   const network = new Network(supportedNetworks[env.chainId], env.chainId);
@@ -176,14 +176,12 @@ function isOvalConfig(input: unknown): input is OvalConfig {
     typeof input === "object" &&
     input !== null &&
     !Array.isArray(input) &&
-    (
-      ("unlockerKey" in input && typeof input["unlockerKey"] === "string" &&
-        ((!input["unlockerKey"].startsWith("0x") && isHexString("0x" + input["unlockerKey"], 32)) ||
-          isHexString(input["unlockerKey"], 32)) &&
-        !("gckmsKeyId" in input)) ||
-      ("gckmsKeyId" in input && typeof input["gckmsKeyId"] === "string" &&
-        !("unlockerKey" in input))
-    ) &&
+    (("unlockerKey" in input &&
+      typeof input["unlockerKey"] === "string" &&
+      ((!input["unlockerKey"].startsWith("0x") && isHexString("0x" + input["unlockerKey"], 32)) ||
+        isHexString(input["unlockerKey"], 32)) &&
+      !("gckmsKeyId" in input)) ||
+      ("gckmsKeyId" in input && typeof input["gckmsKeyId"] === "string" && !("unlockerKey" in input))) &&
     "refundAddress" in input &&
     typeof input["refundAddress"] === "string" &&
     isAddress(input["refundAddress"]) &&
@@ -204,7 +202,8 @@ function isOvalConfigs(input: unknown): input is OvalConfigs {
     Object.keys(input).length === new Set(Object.keys(input)).size &&
     Object.keys(input).every((key) => isAddress(key)) &&
     Object.values(input).every((value) => isOvalConfig(value)) &&
-    Object.values(input).length === new Set(Object.values(input).map((value) => value.unlockerKey || value.gckmsKeyId)).size
+    Object.values(input).length ===
+    new Set(Object.values(input).map((value) => value.unlockerKey || value.gckmsKeyId)).size
   );
 }
 
@@ -237,10 +236,70 @@ export function getOvalConfigs(input: string): OvalConfigs {
   throw new Error(`Value "${input}" is valid JSON but is not OvalConfigs records`);
 }
 
+// Type guard for OvalConfigShared.
+function isOvalConfigShared(input: unknown): input is OvalConfigShared {
+  return (
+    typeof input === "object" &&
+    input !== null &&
+    !Array.isArray(input) &&
+    (
+      ("unlockerKey" in input && typeof input["unlockerKey"] === "string" &&
+        ((!input["unlockerKey"].startsWith("0x") && isHexString("0x" + input["unlockerKey"], 32)) ||
+          isHexString(input["unlockerKey"], 32)) &&
+        !("gckmsKeyId" in input)) ||
+      ("gckmsKeyId" in input && typeof input["gckmsKeyId"] === "string" &&
+        !("unlockerKey" in input))
+    )
+  );
+}
+
+// Type guard for OvalConfigsShared.
+function isOvalConfigsShared(input: unknown): input is OvalConfigsShared {
+  return (
+    Array.isArray(input) &&
+    input.every((value) => isOvalConfigShared(value)) &&
+    input.length === new Set(input.map((value) => value.unlockerKey || value.gckmsKeyId)).size
+  );
+}
+
+export function getOvalConfigsShared(input: string): OvalConfigsShared {
+  let parsedInput: unknown;
+
+  try {
+    parsedInput = JSON.parse(input);
+  } catch (error) {
+    throw new Error(`Value "${input}" cannot be converted to OvalConfigsShared records`);
+  }
+
+  if (isOvalConfigsShared(parsedInput)) {
+    return parsedInput;
+  }
+
+  throw new Error(`Value "${input}" is valid JSON but is not OvalConfigsShared records`);
+}
+
+export const getOvalAddresses = (): string[] => {
+  const factoryInstances = OvalDiscovery.getInstance().getOvalFactoryInstances();
+  return [...Object.keys(env.ovalConfigs), ...factoryInstances].map(getAddress);
+};
+
+export const isOvalSharedUnlockerKey = (unlockerKey: string): boolean => {
+  return WalletManager.getInstance().isOvalSharedUnlocker(unlockerKey);
+};
+
+export const getOvalRefundConfig = (ovalAddress: string): RefundConfig => {
+  if (env.ovalConfigs[ovalAddress]) {
+    return env.ovalConfigs[ovalAddress];
+  }
+  return {
+    refundAddress: getAddress(env.defaultRefundAddress),
+    refundPercent: env.defaultRefundPercent,
+  };
+};
+
 // Get OvalAddressConfigList from the header string or throw an error if the header is invalid.
 export const getOvalHeaderConfigs = (
-  header: string | string[] | undefined,
-  ovalConfigs: OvalConfigs,
+  header: string | string[] | undefined
 ): { errorMessage?: string; ovalAddresses: OvalAddressConfigList | undefined } => {
   if (!header) return { ovalAddresses: undefined };
   if (typeof header !== "string") return { ovalAddresses: undefined };
@@ -251,10 +310,10 @@ export const getOvalHeaderConfigs = (
     }
     // Normalise addresses and check if they are valid Oval instances.
     const normalisedAddresses = ovalAddresses.map(getAddress);
-    if (normalisedAddresses.some((ovalAddress) => !ovalConfigs[ovalAddress])) {
+    if (normalisedAddresses.some((ovalAddress) => !getOvalAddresses().includes(ovalAddress))) {
       throw new Error(`Some addresses in "${header}" are not valid Oval instances`);
     }
-    const uniqueRefundAddresses = new Set(normalisedAddresses.map((address) => ovalConfigs[address].refundAddress));
+    const uniqueRefundAddresses = new Set(normalisedAddresses.map((address) => getOvalRefundConfig(address).refundAddress));
     if (uniqueRefundAddresses.size > 1) {
       throw new Error(`Value "${header}" only supports a single refund address`);
     }
@@ -283,8 +342,23 @@ export function verifyBundleSignature(
     return null;
   }
 
-  const bundleSignaturePublicKey = xFlashbotsSignatureHeader.split(":")[0];
-  const bundleSignedMessage = xFlashbotsSignatureHeader.split(":")[1];
+  const xFlashbotsSignatureHeaderParts = xFlashbotsSignatureHeader.split(":");
+  if (xFlashbotsSignatureHeaderParts.length !== 2) {
+    Logger.debug(
+      req.transactionId,
+      `Invalid signature header: ${xFlashbotsSignatureHeader}, expected address and signature separated by a colon`,
+    );
+    return null;
+  }
+
+  const bundleSignaturePublicKey = xFlashbotsSignatureHeaderParts[0];
+  if (!isAddress(bundleSignaturePublicKey)) {
+    Logger.debug(req.transactionId, `Invalid signature header: ${xFlashbotsSignatureHeader}, expected valid address`);
+    return null;
+  }
+  const bundleSignatureAddress = getAddress(bundleSignaturePublicKey);
+
+  const bundleSignedMessage = xFlashbotsSignatureHeaderParts[1];
 
   const serializedBody = JSON.stringify(body);
 
@@ -292,7 +366,7 @@ export function verifyBundleSignature(
 
   const recoveredAddress = ethers.verifyMessage(hash, bundleSignedMessage);
 
-  const verified = recoveredAddress === bundleSignaturePublicKey;
+  const verified = recoveredAddress === bundleSignatureAddress;
 
   return verified ? recoveredAddress : null;
 }
@@ -310,40 +384,7 @@ export function getMaxBlockByChainId(chainId: number, targetBlock: number) {
   // In mainnet this is always the targetBlock, but in Goerli we add 24 blocks to the targetBlock.
   return targetBlock + env.chainIdBlockOffsets[chainId];
 }
-export class WalletManager {
-  private static instance: WalletManager;
-  private wallets: Record<string, Wallet> = {};
 
-  private constructor() { }
-
-  public static getInstance(): WalletManager {
-    if (!WalletManager.instance) {
-      WalletManager.instance = new WalletManager();
-    }
-    return WalletManager.instance;
-  }
-
-  public async initialize(ovalConfigs: OvalConfigs) {
-    // Oval Config addresses are already checksummed.
-    for (const [address, config] of Object.entries(ovalConfigs)) {
-      if (config.unlockerKey) {
-        this.wallets[address] = new Wallet(config.unlockerKey);
-      } else if (config.gckmsKeyId) {
-        const gckmsKey = await retrieveGckmsKey({
-          ...JSON.parse(env.gckmsConfig),
-          cryptoKeyId: config.gckmsKeyId,
-          ciphertextFilename: `${config.gckmsKeyId}.enc`,
-        });
-        this.wallets[address] = new Wallet(gckmsKey);
-      }
-    }
-  }
-
-  public getWallet(address: string, provider: JsonRpcProvider): Wallet {
-    const checkSummedAddress = getAddress(address);
-    if (!this.wallets[checkSummedAddress]) {
-      throw new Error(`No unlocker key or GCKMS key ID found for Oval address ${address}`);
-    }
-    return this.wallets[checkSummedAddress].connect(provider);
-  }
+export function isMochaTest() {
+  return typeof global.it === 'function';
 }

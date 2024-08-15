@@ -1,6 +1,6 @@
 {
   "compilerOptions": {
-    "target": "es2022",
+    "target": "ES2022",
     "module": "commonjs",
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
@@ -8,5 +8,11 @@
     "skipLibCheck": true,
     "outDir": "./out"
   },
-  "exclude": ["node_modules", "build/**/*"]
+  "exclude": [
+    "node_modules",
+    "build/**/*"
+  ],
+  "include": [
+    "src/**/*.ts"
+  ]
 }

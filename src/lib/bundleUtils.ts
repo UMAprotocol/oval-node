@@ -1,25 +1,25 @@
 import { Interface, Transaction, TransactionRequest, Wallet } from "ethers";
 import express from "express";
 import { FlashbotsBundleProvider } from "flashbots-ethers-v6-provider-bundle";
-import { WalletManager, getBaseFee, getMaxBlockByChainId, getProvider } from "./helpers";
+import { getBaseFee, getMaxBlockByChainId, getOvalAddresses, getOvalRefundConfig, getProvider, isOvalSharedUnlockerKey } from "./helpers";
+import { WalletManager } from "./walletManager";
 
 import MevShareClient, { BundleParams } from "@flashbots/mev-share-client";
 import { JSONRPCID, createJSONRPCSuccessResponse } from "json-rpc-2.0";
 
-import { ovalAbi } from "../abi";
 import { env } from "./env";
 import { Logger } from "./logging";
 import { Refund } from "./types";
-const { ovalConfigs } = env;
+import { Oval__factory, PermissionProxy__factory } from "../contract-types";
 
-export const ovalInterface = Interface.from(ovalAbi);
+export const ovalInterface = Oval__factory.createInterface();
 
 export const createUnlockLatestValueTx = async (
   wallet: Wallet,
   baseFee: bigint,
   data: string,
   chainId: bigint,
-  ovalAddress: string,
+  target: string,
 ) => {
   const nonce = await wallet.getNonce();
 
@@ -27,7 +27,7 @@ export const createUnlockLatestValueTx = async (
   const unlockTx: TransactionRequest = {
     type: 2,
     chainId,
-    to: ovalAddress,
+    to: target,
     nonce,
     value: 0,
     gasLimit: 200000,
@@ -55,15 +55,24 @@ export const prepareUnlockTransaction = async (
   simulate = true,
 ) => {
   const provider = getProvider();
-  const unlockerWallet = WalletManager.getInstance().getWallet(ovalAddress, provider);
   const [baseFee, network] = await Promise.all([getBaseFee(provider, req), provider.getNetwork()]);
-  const data = ovalInterface.encodeFunctionData("unlockLatestValue");
+  const unlockerWallet = WalletManager.getInstance().getWallet(ovalAddress, targetBlock, req.transactionId);
+  const isSharedWallet = isOvalSharedUnlockerKey(unlockerWallet.address);
+
+  // Encode the unlockLatestValue function call depending on whether the unlocker is a shared wallet or not.
+  let data = ovalInterface.encodeFunctionData("unlockLatestValue");
+  let target = ovalAddress;
+  if (isSharedWallet) {
+    target = env.permissionProxyAddress;
+    data = PermissionProxy__factory.createInterface().encodeFunctionData("execute", [ovalAddress, data]);
+  }
+
   const { unlockTxHash, signedUnlockTx } = await createUnlockLatestValueTx(
     unlockerWallet,
     baseFee,
     data,
     network.chainId,
-    ovalAddress,
+    target,
   );
 
   if (!simulate) return { ovalAddress, unlockTxHash, signedUnlockTx };
@@ -80,9 +89,9 @@ export const getUnlockBundlesFromOvalAddresses = async (
   ovalAddresses: string[],
   req: express.Request,
 ) => {
-  const unlockBundles = [];
-  const unlockSignedTransactions = [];
-  const unlockTxHashes = [];
+  const unlockBundles: { bundle: BundleParams }[] = [];
+  const unlockSignedTransactions: string[] = [];
+  const unlockTxHashes: string[] = [];
   for (const ovalAddress of ovalAddresses) {
     const unlock = await prepareUnlockTransaction(
       flashbotsBundleProvider,
@@ -96,7 +105,7 @@ export const getUnlockBundlesFromOvalAddresses = async (
     // Construct the inner bundle with call to Oval to unlock the latest value.
     const unlockBundle = createUnlockLatestValueBundle(
       unlock.signedUnlockTx,
-      ovalConfigs[ovalAddress].refundAddress,
+      getOvalRefundConfig(ovalAddress).refundAddress,
       targetBlock,
     );
 
@@ -116,7 +125,7 @@ export const findUnlock = async (
   req: express.Request,
 ) => {
   const unlocks = await Promise.all(
-    Object.keys(ovalConfigs).map(async (ovalAddress) =>
+    getOvalAddresses().map(async (ovalAddress) =>
       prepareUnlockTransaction(flashbotsBundleProvider, backrunTxs, targetBlock, ovalAddress, req),
     ),
   );

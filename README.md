@@ -34,6 +34,7 @@ Define a `.env` file and define, at minimum, the following (see [here](./src/lib
 
 ```
 OVAL_CONFIGS=<oval_configs_json>              # JSON string that maps Oval contract addresses to their specific configurations (see below).
+OVAL_CONFIGS_SHARED=<oval_configs_shared_json># JSON string for shared unlocker configurations (see below).
 OVAL_ADDRESS=0x420                            # (Only if not using OVAL_CONFIGS) The address of the Oval contract you want to target with the Oval Node.
 REFUND_ADDRESS=0x42069                        # (Only if not using OVAL_CONFIGS) The refund address you want to send the OEV kickback to.
 REFUND_PERCENT=0.5                            # (Only if not using OVAL_CONFIGS) The percentage of the OEV kickback to send to the refund address.
@@ -47,7 +48,6 @@ CHAIN_ID=<network_chain_id>                   # Chain ID of the Ethereum network
 ```
 
 `OVAL_CONFIGS` is a JSON string that maps Oval contract addresses to their specific configurations. Each entry in this JSON object should have the following format:
-
 
 ```json
 {
@@ -65,6 +65,19 @@ CHAIN_ID=<network_chain_id>                   # Chain ID of the Ethereum network
 - `GCKMS_Key_ID`: The GCKMS key ID of the wallet permitted to unlock prices in the specified Oval contract.
 - `Refund_Address`: The Ethereum address where refunds will be sent.
 - `Refund_Percentage`: The percentage of the OEV kickback to send to the refund address.
+
+`OVAL_CONFIGS_SHARED` is a JSON string that specifies the shared unlocker configurations for all Oval contracts. Each entry in this JSON object should have the following format:
+
+```json
+[
+  {
+    "unlockerKey": "<Unlocker_Private_Key>", // Optional: Use either this or gckmsKeyId, not both.
+    "gckmsKeyId": "<GCKMS_Key_ID>", // Optional: Use either this or unlockerKey, not both.
+  },...
+]
+```
+
+Note: If an Oval instance has an instance specific configuration, it will take precedence over the shared configuration.
 
 ### 2. Build & run the Oval Node:
 
