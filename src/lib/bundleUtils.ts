@@ -46,6 +46,7 @@ export const createUnlockLatestValueTx = async (
 };
 
 // Prepare unlockLatestValue transaction for a given Oval instance and simulate the bundle with the unlock transaction prepended if simulate is true.
+// If shouldRecordWalletUsage is true, the wallet usage will be recorded in the WalletManager.
 export const prepareUnlockTransaction = async (
   flashbotsBundleProvider: FlashbotsBundleProvider,
   backrunTxs: string[],
@@ -53,10 +54,11 @@ export const prepareUnlockTransaction = async (
   ovalAddress: string,
   req: express.Request,
   simulate = true,
+  shouldRecordWalletUsage = true,
 ) => {
   const provider = getProvider();
   const [baseFee, network] = await Promise.all([getBaseFee(provider, req), provider.getNetwork()]);
-  const unlockerWallet = WalletManager.getInstance().getWallet(ovalAddress, targetBlock, req.transactionId);
+  const unlockerWallet = WalletManager.getInstance().getWallet(ovalAddress, targetBlock, req.transactionId, shouldRecordWalletUsage);
   const isSharedWallet = isOvalSharedUnlockerKey(unlockerWallet.address);
 
   // Encode the unlockLatestValue function call depending on whether the unlocker is a shared wallet or not.
@@ -75,11 +77,11 @@ export const prepareUnlockTransaction = async (
     target,
   );
 
-  if (!simulate) return { ovalAddress, unlockTxHash, signedUnlockTx };
+  if (!simulate) return { ovalAddress, unlockTxHash, signedUnlockTx, unlockerWallet };
 
   const simulationResponse = await flashbotsBundleProvider.simulate([signedUnlockTx, ...backrunTxs], targetBlock);
 
-  return { ovalAddress, unlockTxHash, signedUnlockTx, simulationResponse };
+  return { ovalAddress, unlockTxHash, signedUnlockTx, simulationResponse, unlockerWallet };
 };
 
 export const getUnlockBundlesFromOvalAddresses = async (
@@ -99,7 +101,7 @@ export const getUnlockBundlesFromOvalAddresses = async (
       targetBlock,
       ovalAddress,
       req,
-      false,
+      false, // Do not simulate
     );
 
     // Construct the inner bundle with call to Oval to unlock the latest value.
@@ -117,16 +119,19 @@ export const getUnlockBundlesFromOvalAddresses = async (
 };
 
 // Simulate calls to unlockLatestValue on each Oval instance bundled with original backrun transactions. Tries to find
-// the first unlock that doesn't revert the bundle.
+// the first unlock that doesn't revert the bundle. If updateWalletUsage is true, the wallet usage will be recorded in the WalletManager.
 export const findUnlock = async (
   flashbotsBundleProvider: FlashbotsBundleProvider,
   backrunTxs: string[],
   targetBlock: number,
   req: express.Request,
+  updateWalletUsage = true
 ) => {
   const unlocks = await Promise.all(
     getOvalAddresses().map(async (ovalAddress) =>
-      prepareUnlockTransaction(flashbotsBundleProvider, backrunTxs, targetBlock, ovalAddress, req),
+      // Do not record wallet usage here as we will record it in the loop below once we find a valid unlock.
+      // See shouldRecordWalletUsage parameter in WalletManager.getWallet.
+      prepareUnlockTransaction(flashbotsBundleProvider, backrunTxs, targetBlock, ovalAddress, req, true, false),
     ),
   );
 
@@ -137,6 +142,9 @@ export const findUnlock = async (
       !("error" in unlock.simulationResponse) &&
       !unlock.simulationResponse.firstRevert
     ) {
+      if (updateWalletUsage) {
+        WalletManager.getInstance().updateWalletUsage(unlock.ovalAddress, unlock.unlockerWallet, targetBlock);
+      }
       return {
         // Spread in order to preserve inferred SimulationResponseSuccess type.
         ...unlock,
