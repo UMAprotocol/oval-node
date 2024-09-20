@@ -49,50 +49,57 @@ export class WalletManager {
     }
 
     // Get a wallet for a given address
-    public getWallet(address: string, targetBlock: number, transactionId: string): Wallet {
+    // If shouldRecordUsage is true, the wallet usage will be recorded in the WalletManager.
+    public getWallet(address: string, targetBlock: number, transactionId: string, shouldRecordUsage = true): Wallet {
         if (!this.provider) {
             throw new Error("Provider is not initialized");
         }
         const checkSummedAddress = getAddress(address);
         const wallet = this.wallets[checkSummedAddress];
         if (!wallet) {
-            return this.getSharedWallet(address, targetBlock, transactionId);
+            return this.getSharedWallet(address, targetBlock, transactionId, shouldRecordUsage);
         }
         return wallet.connect(this.provider);
     }
 
     // Get a shared wallet for a given Oval instance and target block
-    private getSharedWallet(ovalInstance: string, targetBlock: number, transactionId: string): Wallet {
+    private getSharedWallet(ovalInstance: string, targetBlock: number, transactionId: string, shouldRecordUsage = true): Wallet {
         if (!this.provider) {
             throw new Error("Provider is not initialized");
         }
+
         if (!this.ovalDiscovery.isOval(ovalInstance)) {
             throw new Error(`Oval instance ${ovalInstance} is not found`);
         }
 
-        let selectedWallet: Wallet | undefined;
-
-        // Check if a wallet has already been assigned to this Oval instance
-        for (const [walletPubKey, instanceUsage] of this.sharedWalletUsage.entries()) {
-            for (const [_, record] of instanceUsage.entries()) {
-                if (record.ovalInstances && record.ovalInstances.has(ovalInstance)) {
-                    selectedWallet = this.sharedWallets.get(walletPubKey)!.connect(this.provider!);
-                }
-            }
-        }
+        let selectedWallet = this.findAssignedWallet(ovalInstance);
 
         // If no wallet has been assigned, find the least used wallet
         if (!selectedWallet) {
             selectedWallet = this.findLeastUsedWallet(transactionId);
         }
 
-        // Update the usage of the selected wallet
-        if (selectedWallet) {
-            this.updateWalletUsage(ovalInstance, selectedWallet, targetBlock);
-            return selectedWallet.connect(this.provider);
+        if (!selectedWallet) {
+            throw new Error(`No available shared wallets for Oval instance ${ovalInstance} at block ${targetBlock}`);
         }
 
-        throw new Error(`No available shared wallets for Oval instance ${ovalInstance} at block ${targetBlock}`);
+        // Update the usage of the selected wallet if recording is enabled
+        if (shouldRecordUsage) {
+            this.updateWalletUsage(ovalInstance, selectedWallet, targetBlock);
+        }
+
+        return selectedWallet.connect(this.provider);
+    }
+
+    private findAssignedWallet(ovalInstance: string): Wallet | undefined {
+        for (const [walletPubKey, instanceUsage] of this.sharedWalletUsage.entries()) {
+            for (const record of instanceUsage.values()) {
+                if (record.ovalInstances?.has(ovalInstance)) {
+                    return this.sharedWallets.get(walletPubKey)?.connect(this.provider!);
+                }
+            }
+        }
+        return undefined;
     }
 
     public isOvalSharedUnlocker(unlockerPublicKey: string): boolean {
@@ -190,12 +197,11 @@ export class WalletManager {
         if (minInstances !== Infinity && minInstances !== 0) {
             Logger.error(transactionId, `Public key ${selectedWallet?.address} is reused in multiple Oval instances because no free wallets are available.`);
         }
-
         return selectedWallet;
     }
 
     // Update the usage statistics for a wallet
-    private async updateWalletUsage(ovalInstance: string, wallet: Wallet, targetBlock: number): Promise<void> {
+    public async updateWalletUsage(ovalInstance: string, wallet: Wallet, targetBlock: number): Promise<void> {
         const walletPubKey = await wallet.getAddress();
         const instanceUsage = this.sharedWalletUsage.get(walletPubKey) || new Map();
         const existingRecord = instanceUsage.get(targetBlock);

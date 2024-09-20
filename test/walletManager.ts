@@ -141,6 +141,42 @@ describe('WalletManager Tests', () => {
         expect(errorSpy.args[0][1]).to.include(`Public key ${wallet2.address} is reused in multiple Oval instances because no free wallets are available.`);
     });
 
+    it('should not record usage when shouldRecordUsage is false', async () => {
+        const unlockerRandom = getRandomAddressAndKey();
+        const sharedConfigs: OvalConfigsShared = [
+            { unlockerKey: unlockerRandom.privateKey },
+        ];
+        const walletManager = WalletManager.getInstance();
+        await walletManager.initialize(mockProvider, {}, sharedConfigs);
+
+        const ovalInstance = getRandomAddressAndKey().address;
+        const targetBlock = 123;
+
+        const wallet = walletManager.getWallet(ovalInstance, targetBlock, "transactionId", false);
+
+        const sharedWalletUsage = walletManager['sharedWalletUsage'].get(await wallet.getAddress());
+        expect(sharedWalletUsage).to.be.undefined;
+    });
+
+    it('should record usage when shouldRecordUsage is true', async () => {
+        const unlockerRandom = getRandomAddressAndKey();
+        const sharedConfigs: OvalConfigsShared = [
+            { unlockerKey: unlockerRandom.privateKey },
+        ];
+        const walletManager = WalletManager.getInstance();
+        await walletManager.initialize(mockProvider, {}, sharedConfigs);
+
+        const ovalInstance = getRandomAddressAndKey().address;
+        const targetBlock = 123;
+
+        const wallet = await walletManager.getWallet(ovalInstance, targetBlock, "transactionId");
+
+        const sharedWalletUsage = walletManager['sharedWalletUsage'].get(await wallet.getAddress());
+        expect(sharedWalletUsage).to.not.be.undefined;
+        expect(sharedWalletUsage?.get(targetBlock)?.count).to.equal(1);
+        expect(sharedWalletUsage?.get(targetBlock)?.ovalInstances.has(ovalInstance)).to.be.true;
+    });
+
     it('should cleanup old records correctly', async () => {
         const unlockerRandom = getRandomAddressAndKey();
         const sharedConfigs: OvalConfigsShared = [
