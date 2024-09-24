@@ -235,7 +235,8 @@ app.post("/", async (req, res, next) => {
       } else {
         Logger.debug(req.transactionId, "Finding unlock that does not revert the bundle...");
 
-        const unlock = await findUnlock(flashbotsBundleProvider, backrunTxs, targetBlock, req);
+        // FindUnlock with recordWalletUsage set to false to prevent recording wallet usage in WalletManager.
+        const unlock = await findUnlock(flashbotsBundleProvider, backrunTxs, targetBlock, req, false);
         if (!unlock) {
           Logger.debug(req.transactionId, "No valid unlock found!");
           await handleUnsupportedRequest(req, res, "No valid unlock found"); // Pass through if no unlock is found.
