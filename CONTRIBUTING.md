@@ -36,7 +36,7 @@ After do your modifications, go thorugh the [github UI](https://github.com/UMApr
 
 Now to get the code to production, on the UI, create a new PR from `development` to `master`.
 
-Remember: **NEVER** the oposite.
+Remember: **NEVER** the opposite.
 
 ![alt text](https://i.imgur.com/BlNsMEW.png)
 
