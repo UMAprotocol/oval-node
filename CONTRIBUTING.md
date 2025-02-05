@@ -27,7 +27,7 @@ $ git pull
 $ git checkout -b {your-new-branch}
 
 ```
-**ALWAYS** make sure to chekout from a updated `development` branch.
+**ALWAYS** make sure to checkout from a updated `development` branch.
 
 After do your modifications, go thorugh the [github UI](https://github.com/UMAprotocol/oval-node/compare) to open a new PR from `{your-new-branch}` to `development`
 
